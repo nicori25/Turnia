@@ -1,0 +1,230 @@
+// ---- Turnia design tokens -------------------------------------------
+// Two color-coded worlds: teal for the client booking flow, coral for
+// the barber's admin panel — matches the flow diagram from the project docs.
+
+:root {
+  --color-bg: #1c1b19;
+  --color-bg-elevated: #242320;
+  --color-border: #3a372f;
+  --color-text: #f4efe3;
+  --color-text-muted: #a39c8a;
+
+  --color-teal: #2ea37f;
+  --color-teal-dim: #16332b;
+  --color-coral: #d16a44;
+  --color-coral-dim: #3c2019;
+
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  --radius: 10px;
+  --max-width: 480px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+button {
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+// focus visibility, kept consistent across both worlds
+:focus-visible {
+  outline: 2px solid var(--color-teal);
+  outline-offset: 2px;
+}
+
+// the admin panel is coral-coded, so its focus ring follows suit
+.admin-theme :focus-visible {
+  outline-color: var(--color-coral);
+}
+
+// ---- shared building blocks -------------------------------------------
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen--client {
+  align-items: center;
+  padding: 32px 20px 48px;
+}
+
+.card {
+  width: 100%;
+  max-width: var(--max-width);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: var(--color-teal);
+}
+
+.step-indicator__num {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.step-indicator__label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 999px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn--teal {
+  background: var(--color-teal);
+  color: #0d1e18;
+}
+
+.btn--coral {
+  background: var(--color-coral);
+  color: #241109;
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.field input,
+.field select {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 15px;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: var(--color-teal);
+}
+
+.form-error {
+  font-size: 13px;
+  color: var(--color-coral);
+  margin-bottom: 16px;
+}
+
+.form-notice {
+  font-size: 13px;
+  color: var(--color-teal);
+  margin-bottom: 16px;
+}
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  text-align: left;
+  color: var(--color-text);
+}
+
+.option[aria-pressed='true'] {
+  border-color: var(--color-teal);
+  background: var(--color-teal-dim);
+}
+
+.option__price {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.option[aria-pressed='true'] .option__price {
+  color: var(--color-teal);
+}
