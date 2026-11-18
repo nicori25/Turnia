@@ -96,7 +96,7 @@ assert.equal(free.status, 200, free.body?.message)
 assert(free.body.includes('10:00:00'))
 assert.deepEqual((await availability(long, '2000-01-01')).body, [])
 
-const book = (payload) => rpc('reservar_turno', payload)
+const book = (payload) => rpc('reservar_turno_app', payload)
 const booking = {
   p_solicitud_id: randomUUID(),
   p_servicio_id: long,

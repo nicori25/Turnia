@@ -31,7 +31,7 @@ export async function loadAvailability(serviceId, professionalId, date, signal) 
 }
 
 export async function saveReservation({ requestId, service, draft, name, phone, price }) {
-  const { data, error } = await supabase.rpc('reservar_turno', {
+  const { data, error } = await supabase.rpc('reservar_turno_app', {
     p_solicitud_id: requestId,
     p_servicio_id: service.serviceId,
     p_profesional_id: service.professionalId,

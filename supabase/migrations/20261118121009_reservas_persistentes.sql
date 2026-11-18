@@ -75,6 +75,13 @@ alter table public.servicios enable row level security;
 alter table public.clientes enable row level security;
 alter table public.turnos enable row level security;
 
+-- La política de edición del propio perfil conserva los campos de
+-- contacto. La identidad y el rol los administra el servidor.
+revoke update on public.perfiles from public, anon, authenticated;
+revoke update (id, organizacion_id, rol, created_at, nombre, telefono)
+  on public.perfiles from public, anon, authenticated;
+grant update (nombre, telefono) on public.perfiles to authenticated;
+
 alter table public.turnos add column duracion_min integer,
   add column solicitud_id uuid unique;
 
@@ -368,7 +375,7 @@ returns setof time
 language sql stable set search_path = ''
 as $$ select * from turnia_private.horarios_disponibles(p_servicio_id, p_profesional_id, p_fecha) $$;
 
-create function public.reservar_turno(p_solicitud_id uuid, p_servicio_id uuid, p_profesional_id uuid, p_fecha date, p_hora time, p_vip boolean, p_cliente_nombre text, p_cliente_telefono text, p_precio_esperado numeric)
+create function public.reservar_turno_app(p_solicitud_id uuid, p_servicio_id uuid, p_profesional_id uuid, p_fecha date, p_hora time, p_vip boolean, p_cliente_nombre text, p_cliente_telefono text, p_precio_esperado numeric)
 returns jsonb
 language sql set search_path = ''
 return turnia_private.reservar_turno(p_solicitud_id, p_servicio_id, p_profesional_id, p_fecha, p_hora, p_vip, p_cliente_nombre, p_cliente_telefono, p_precio_esperado);
@@ -404,8 +411,8 @@ revoke execute on function public.catalogo_turnia() from public, anon, authentic
 grant execute on function public.catalogo_turnia(), turnia_private.catalogo_turnia() to anon, authenticated;
 revoke execute on function public.horarios_disponibles(uuid, uuid, date) from public, anon, authenticated;
 grant execute on function public.horarios_disponibles(uuid, uuid, date), turnia_private.horarios_disponibles(uuid, uuid, date) to anon, authenticated;
-revoke execute on function public.reservar_turno(uuid, uuid, uuid, date, time, boolean, text, text, numeric) from public, anon, authenticated;
-grant execute on function public.reservar_turno(uuid, uuid, uuid, date, time, boolean, text, text, numeric), turnia_private.reservar_turno(uuid, uuid, uuid, date, time, boolean, text, text, numeric) to anon, authenticated;
+revoke execute on function public.reservar_turno_app(uuid, uuid, uuid, date, time, boolean, text, text, numeric) from public, anon, authenticated;
+grant execute on function public.reservar_turno_app(uuid, uuid, uuid, date, time, boolean, text, text, numeric), turnia_private.reservar_turno(uuid, uuid, uuid, date, time, boolean, text, text, numeric) to anon, authenticated;
 revoke execute on function public.mi_agenda_turnia(date, uuid) from public, anon, authenticated;
 grant execute on function public.mi_agenda_turnia(date, uuid), turnia_private.mi_agenda_turnia(date, uuid) to authenticated;
 revoke execute on function public.cambiar_estado_turnia(uuid, text) from public, anon, authenticated;

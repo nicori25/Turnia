@@ -11,6 +11,11 @@ declare
   turno_a uuid;
   turno_b uuid;
 begin
+  assert not has_column_privilege('authenticated', 'public.perfiles', 'rol', 'UPDATE');
+  assert not has_column_privilege('authenticated', 'public.perfiles', 'organizacion_id', 'UPDATE');
+  assert has_column_privilege('authenticated', 'public.perfiles', 'nombre', 'UPDATE');
+  assert not has_column_privilege('anon', 'public.perfiles', 'nombre', 'UPDATE');
+
   insert into auth.users (id) values (administrador), (profesional);
   insert into public.organizaciones (nombre, slug) values ('Prueba profesional', 'test-' || gen_random_uuid())
     returning id into organizacion;

@@ -64,7 +64,7 @@ select jsonb_build_object(
     select jsonb_agg(p.oid::regprocedure::text order by p.proname, p.oid)
     from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname in (
-      'catalogo_turnia', 'horarios_disponibles', 'reservar_turno', 'mi_agenda_turnia',
+      'catalogo_turnia', 'horarios_disponibles', 'reservar_turno', 'reservar_turno_app', 'mi_agenda_turnia',
       'cambiar_estado_turnia', 'mis_servicios_turnia', 'guardar_servicio_turnia', 'preparar_cuenta_turnia'
     )
   ), '[]'::jsonb),
