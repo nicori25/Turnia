@@ -31,7 +31,7 @@ Las reservas y los cambios de la demo viven en memoria. La agenda de prueba y el
 ## Reservas con Supabase
 
 1. Prepará una instancia local con `supabase start` o vinculá la CLI al proyecto de Turnia y aplicá la migración de `supabase/migrations/` con `supabase db push`.
-2. Copiá `.env.example` a `.env` y completá la URL y la clave *publishable* de la instancia. En Expo Go usá una URL que pueda abrir el teléfono. Para una web publicada, incluí esas variables al ejecutar `npm run build:web`.
+2. La rama `App` ya incluye la URL y la clave pública de Turnia en `.env`. Para usar otra instancia, copiá `.env.example` a `.env.local` y completá sus valores. En Expo Go, usá una URL que el teléfono pueda abrir.
 3. Registrá una cuenta de barbero. Si está habilitada la confirmación por correo, configurá las URL de redirección en Supabase y validá la cuenta antes del primer ingreso.
 4. Desde **Agenda de turnos → Administrar servicios**, cargá los servicios, sus duraciones y precios. Los servicios activos aparecen en el catálogo. Una vez hecha una reserva, abrí la fecha correspondiente en la agenda o usá **Actualizar agenda** si ya la tenías abierta.
 
