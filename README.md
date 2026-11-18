@@ -1,36 +1,37 @@
-# Turnia — pantallas del sistema
+# Turnia
 
-Prototipo de las pantallas de Turnia hecho con **Vue 3 + Vue Router + Vite**, usando Sass para los estilos.
+Turnia es un prototipo de reservas de barbería, desarrollado con React Native y Expo SDK 58. La versión web y Expo Go usan las mismas pantallas.
 
-## Cómo correrlo
+## Probar la aplicación
 
-```bash
-npm install
-cp .env.example .env   # completá con la URL y anon key de tu proyecto de Supabase
-npm run dev
+Usá Node.js LTS compatible con Expo SDK 58 e instalá las dependencias.
+
+```sh
+npm ci
+npm run web
 ```
 
-## Registro y login (Supabase Auth)
+Para abrir la app en un celular con Expo Go compatible con SDK 58, conectá ambos equipos a la misma red, ejecutá `npm start` y escaneá el QR de Expo. Si la red impide la conexión directa, podés probar `npm start -- --tunnel`.
 
-El barbero se registra y loguea con email y contraseña usando Supabase Auth (`src/store/auth.js`). El cliente **no** se registra — sigue reservando directo, sin cuenta.
+```sh
+npm run build:web
+```
 
-- `/admin/registro` — alta de cuenta (`supabase.auth.signUp`)
-- `/admin/login` — inicio de sesión (`supabase.auth.signInWithPassword`)
-- `/admin/panel` y `/admin/turno/:id` están protegidas: si no hay sesión activa, el router redirige a `/admin/login`
+La compilación web se exporta a `dist/`. Para publicarla, el alojamiento debe servir los archivos HTML de cada ruta, incluidas `/admin/login` y `/admin/turno`.
 
-Si en tu proyecto de Supabase está activada la confirmación por email (viene así por defecto), después de registrarse el usuario tiene que confirmar el mail antes de poder loguearse — la pantalla de registro ya avisa eso.
+## Recorrido de demostración
 
-## Pantallas incluidas
+1. Elegí un servicio, una fecha y un horario. La opción VIP agrega un recargo al precio de ejemplo.
+2. Ingresá un nombre y un teléfono ficticios y confirmá la solicitud.
+3. Entrá por **Soy el barbero → Entrar a la demo**. Si elegiste un día posterior, avanzá al día correspondiente en la agenda.
+4. Abrí el turno para confirmarlo o cancelarlo.
 
-**Vista cliente** (color teal)
-- `/` — Inicio
-- `/reservar` — Elegir servicio y horario (incluye la opción de turno VIP/prioritario)
-- `/confirmar` — Confirmar datos
-- `/confirmacion` — Confirmación
+Las reservas y los cambios de la demo viven en memoria. La agenda de prueba y el flujo del cliente se comparten en una misma sesión de la app. Al recargar, se restablecen los datos de ejemplo.
 
-**Vista barbero** (color coral)
-- `/admin/login` — Login
-- `/admin/panel` — Panel de turnos del día
-- `/admin/turno/:id` — Detalle de turno (confirmar o cancelar)
+## Supabase
 
-Los datos de turnos y de la reserva en curso viven en `src/store/` como estado reactivo en memoria (mock), listos para reemplazarse por las consultas a Supabase más adelante.
+Para probar el registro, el inicio de sesión y la agenda real, copiá `.env.example` a `.env` y completá la URL del proyecto y la clave pública. La agenda usa el esquema existente de `supabase/schema.sql`. Registrá las URL de confirmación y redirección del entorno en Supabase si la confirmación por correo está habilitada. Todas las variables `EXPO_PUBLIC_*` se incluyen en el cliente. Usá únicamente la clave pública.
+
+El flujo público de reservas sigue siendo de demostración aunque se configure el acceso real del barbero. La persistencia de nuevas reservas, el catálogo configurable y las reglas de disponibilidad del servidor se incorporarán al integrar ese módulo.
+
+La documentación de la versión anterior está en [12-11](12-11/LEEME.md). Fotografía de referencia de [Halem Mumtaz Mahal en Pexels](https://www.pexels.com/photo/vintage-barbershop-interior-with-empty-chairs-34865582/).
