@@ -41,7 +41,7 @@ El cálculo del total, el recargo VIP y la detección de superposiciones se ejec
 
 La migración admite una base nueva y el esquema existente de organizaciones, perfiles, profesionales, servicios, clientes y turnos. Los servicios con profesional asignado se ofrecen con esa persona. Los servicios compartidos quedan disponibles para los profesionales activos de su organización. El administrador gestiona la agenda de su organización y un profesional gestiona su propia agenda. Las políticas existentes se conservan y se deben revisar antes de habilitar la web publicada.
 
-En un proyecto con datos, hacé un respaldo y verificá que los turnos activos no se superpongan. La migración conserva los registros y agrega la duración histórica a partir del servicio asociado, con 30 minutos cuando falta ese dato. La versión anterior de esta migración era un prototipo de una sola barbería. Si la instalaste en una instancia local descartable, reiniciá esa instancia antes de probar esta versión.
+En un proyecto con datos, hacé un respaldo y ejecutá [la consulta de diagnóstico](supabase/preflight.sql) en el SQL Editor. Devuelve las políticas, los permisos y el conteo de turnos activos superpuestos, sin mostrar datos de clientes. Revisá ese resultado antes de aplicar la migración. La migración conserva los registros y agrega la duración histórica a partir del servicio asociado, con 30 minutos cuando falta ese dato. La versión anterior de esta migración era un prototipo de una sola barbería. Si la instalaste en una instancia local descartable, reiniciá esa instancia antes de probar esta versión.
 
 ### Prueba de integración de reservas
 
