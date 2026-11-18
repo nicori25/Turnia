@@ -6,20 +6,21 @@ import Clock3 from 'lucide-react-native/icons/clock-3'
 import Scissors from 'lucide-react-native/icons/scissors'
 import Sparkles from 'lucide-react-native/icons/sparkles'
 import { Image, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { Button, colors, Screen, styles } from '../src/components/ui'
-import { formatPrice, services } from '../src/domain/booking'
-import { useDemo } from '../src/domain/demo'
+import { Button, colors, Message, Screen, styles } from '../src/components/ui'
+import { formatPrice } from '../src/domain/booking'
+import { useTurnia } from '../src/domain/turnia'
 
 const serviceIcons = [Scissors, Sparkles, CalendarDays]
 
 export default function Home() {
   const router = useRouter()
-  const { startBooking } = useDemo()
+  const { catalog, catalogError, live, reloadCatalog, startBooking } = useTurnia()
+  const services = catalog?.services.slice(0, 3) ?? []
   const { width } = useWindowDimensions()
   const wide = width >= 880
 
-  function book(serviceId) {
-    startBooking(serviceId)
+  function book(service) {
+    startBooking(service)
     router.push('/reservar')
   }
 
@@ -29,17 +30,17 @@ export default function Home() {
         <View style={[home.heroContent, wide && home.heroContentWide]}>
           <View style={home.studio}>
             <View style={home.dot} />
-            <Text style={styles.label}>Martín Barber Studio</Text>
+            <Text style={styles.label}>{live ? 'Turnos de barbería' : 'Martín Barber Studio'}</Text>
           </View>
           <Text accessibilityRole="header" style={[home.title, wide && home.titleWide]}>
             Tu próximo corte,<Text style={home.accent}> a un turno de distancia.</Text>
           </Text>
           <Text style={home.subtitle}>Elegí el servicio, encontrá tu horario y reservá en minutos.</Text>
           <Button onPress={() => book()} icon={ArrowRight} style={home.cta}>Reservar turno</Button>
-          <View style={home.demo}>
+          {!live && <View style={home.demo}>
             <CalendarDays size={15} color={colors.muted} />
             <Text style={styles.caption}>Demo de reservas · Los turnos son de prueba</Text>
-          </View>
+          </View>}
         </View>
         <View style={[home.photoFrame, wide && home.photoFrameWide]}>
           <Image source={require('../assets/barbershop.jpg')} style={home.photo}
@@ -51,20 +52,28 @@ export default function Home() {
           <Text accessibilityRole="header" style={styles.title}>Servicios</Text>
           <Text style={styles.body}>Elegí qué querés hacerte.</Text>
         </View>
+        {catalogError && (
+          <>
+            <Message error>No pudimos cargar el catálogo.</Message>
+            <Button variant="outline" onPress={reloadCatalog}>Reintentar</Button>
+          </>
+        )}
+        {!catalog && !catalogError && <Message>Cargando servicios…</Message>}
+        {catalog && !services.length && <Message>Todavía no hay servicios habilitados para reservar.</Message>}
         <View style={[home.services, wide && home.servicesWide]}>
           {services.map((service, index) => {
             const Icon = serviceIcons[index]
             return (
               <Pressable key={service.id} accessibilityRole="button"
-                accessibilityLabel={`Reservar ${service.name}, ${service.duration} minutos, ${formatPrice(service.price)}`}
-                onPress={() => book(service.id)}
+                accessibilityLabel={`Reservar ${service.name}, ${service.duration} minutos, ${formatPrice(service.price)}${live ? ', ' + service.business : ''}`}
+                onPress={() => book(service)}
                 style={({ hovered, pressed }) => [home.service, (hovered || pressed) && home.serviceActive]}>
                 <View style={home.serviceHeader}>
                   <View style={home.serviceIcon}><Icon size={20} color={colors.green} /></View>
                   <ChevronRight size={19} color={colors.muted} />
                 </View>
                 <Text style={home.serviceName}>{service.name}</Text>
-                <Text style={styles.caption}>{service.description}</Text>
+                <Text style={styles.caption}>{live ? service.business : service.description}</Text>
                 <View style={home.serviceMeta}>
                   <Text style={home.price}>{formatPrice(service.price)}</Text>
                   <View style={home.duration}>

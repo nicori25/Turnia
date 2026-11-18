@@ -4,6 +4,7 @@ import ArrowRight from 'lucide-react-native/icons/arrow-right'
 import Scissors from 'lucide-react-native/icons/scissors'
 import UserRound from 'lucide-react-native/icons/user-round'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native'
+import { useTurnia } from '../domain/turnia'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 export const colors = {
@@ -42,6 +43,7 @@ export function Button({ children, href, onPress, variant = 'primary', disabled,
 }
 
 export function Screen({ children, home = false, admin = false }) {
+  const { live } = useTurnia()
   const { width } = useWindowDimensions()
   const narrow = width < 620
   return (
@@ -74,7 +76,7 @@ export function Screen({ children, home = false, admin = false }) {
         <View style={styles.footer}>
           <View style={[styles.shell, styles.footerInner]}>
             <Text style={styles.brandText}>turnia<Text style={{ color: colors.green }}>.</Text></Text>
-            <Text style={styles.caption}>Demo de Turnia</Text>
+            <Text style={styles.caption}>{live ? 'Turnos de barbería' : 'Demo de Turnia'}</Text>
           </View>
         </View>
       </ScrollView>

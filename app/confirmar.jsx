@@ -1,39 +1,60 @@
-import { useState } from 'react'
-import { Redirect, useRouter } from 'expo-router'
+import { useCallback, useRef, useState } from 'react'
+import { Redirect, useFocusEffect, useRouter } from 'expo-router'
 import ArrowRight from 'lucide-react-native/icons/arrow-right'
 import { BookingSummary } from '../src/components/booking-summary'
 import { BackLink, Button, Card, Field, Heading, Message, Screen } from '../src/components/ui'
-import { services, validCustomer, vipSurcharge } from '../src/domain/booking'
-import { useDemo } from '../src/domain/demo'
+import { validCustomer } from '../src/domain/booking'
+import { useTurnia } from '../src/domain/turnia'
 
 export default function ConfirmData() {
-  const { draft, reserve } = useDemo()
+  const { live, catalog, draft, reserve } = useTurnia()
   const router = useRouter()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
-  const service = services.find(({ id }) => id === draft.serviceId)
+  const [busy, setBusy] = useState(false)
+  const submitting = useRef(false)
+  const focused = useRef(false)
+  useFocusEffect(useCallback(() => {
+    focused.current = true
+    return () => { focused.current = false }
+  }, []))
+  const service = catalog?.services.find(({ id }) => id === draft.serviceId)
 
   if (!service || !draft.date || !draft.time) return <Redirect href="/reservar" />
 
-  function submit() {
-    const message = reserve(name, phone)
-    setError(message)
-    if (!message) router.replace('/confirmacion')
+  const surcharge = draft.vip ? catalog.surcharge : 0
+
+  async function submit() {
+    if (submitting.current) return
+    submitting.current = true
+    setBusy(true)
+    setError('')
+    try {
+      const message = await reserve(name, phone)
+      setError(message)
+      if (!message && focused.current) router.replace('/confirmacion')
+    } finally {
+      submitting.current = false
+      setBusy(false)
+    }
   }
 
   return (
     <Screen>
-      <BackLink href="/reservar" children="Servicio y horario" />
-      <Heading label="Reserva · 2 de 3" title="Completá tus datos" subtitle="Usá un nombre y un teléfono de prueba para esta demostración." />
+      {!busy && <BackLink href="/reservar" children="Servicio y horario" />}
+      <Heading label="Reserva · 2 de 3" title="Completá tus datos" subtitle={live ? 'La barbería usará estos datos para gestionar tu turno.'
+          : 'Usá un nombre y un teléfono de prueba para esta demostración.'} />
       <BookingSummary service={service.name} date={draft.date} time={draft.time}
-        vip={draft.vip} price={service.price + (draft.vip ? vipSurcharge : 0)} />
+        surcharge={surcharge} price={service.price + surcharge} />
       <Card>
-        <Field label="Nombre" value={name} onChangeText={setName} placeholder="Ej. Alex Pérez" maxLength={80} />
+        <Field label="Nombre" value={name} onChangeText={setName} placeholder="Ej. Alex Pérez" maxLength={80} editable={!busy} />
         <Field label="Teléfono" value={phone} onChangeText={setPhone} keyboardType="phone-pad"
-          placeholder="Ej. 11 1234 5678" maxLength={24} />
+          placeholder="Ej. 11 1234 5678" maxLength={24} editable={!busy} />
         {error ? <Message error>{error}</Message> : null}
-        <Button onPress={submit} disabled={!validCustomer(name, phone)} icon={ArrowRight}>Confirmar turno</Button>
+        <Button onPress={submit} disabled={busy || !validCustomer(name, phone)} icon={ArrowRight}>
+          {busy ? 'Guardando…' : 'Confirmar turno'}
+        </Button>
       </Card>
     </Screen>
   )

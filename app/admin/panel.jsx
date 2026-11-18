@@ -8,7 +8,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Button, Card, colors, Heading, Message, Screen, styles } from '../../src/components/ui'
 import { Status } from '../../src/components/status'
 import { useAgenda } from '../../src/domain/agenda'
-import { formatDate, localDate } from '../../src/domain/booking'
+import { useTurnia } from '../../src/domain/turnia'
+import { businessDate, formatDate, localDate } from '../../src/domain/booking'
 
 function moveDate(value, offset) {
   const [year, month, day] = value.split('-').map(Number)
@@ -16,7 +17,8 @@ function moveDate(value, offset) {
 }
 
 export default function Panel() {
-  const [date, setDate] = useState(localDate)
+  const { admin: demo } = useTurnia()
+  const [date, setDate] = useState(demo ? localDate : businessDate)
   const [signOutError, setSignOutError] = useState('')
   const router = useRouter()
   const agenda = useAgenda({ date })
@@ -42,6 +44,12 @@ export default function Panel() {
         </View>
         {agenda.allowed && <Button onPress={signOut} variant="outline" icon={LogOut}>Salir</Button>}
       </View>
+      {agenda.ready && agenda.allowed && !agenda.demo && (
+        <View style={panel.actions}>
+          <Button href="/admin/servicios" variant="outline">Administrar servicios</Button>
+          <Button variant="outline" onPress={agenda.refresh} disabled={agenda.loading}>Actualizar agenda</Button>
+        </View>
+      )}
       {signOutError ? <Message error>{signOutError}</Message> : null}
       {agenda.demo && <Message>La agenda de prueba se comparte con las reservas de esta sesión. Al recargar, se restablecen los datos de ejemplo.</Message>}
       <Card>
@@ -82,6 +90,7 @@ export default function Panel() {
 const panel = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   heading: { flex: 1 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dateBar: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   date: { flex: 1 },
   dateButton: { alignItems: 'center', justifyContent: 'center', width: 40, height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 7 },

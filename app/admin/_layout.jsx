@@ -7,6 +7,7 @@ export default function AdminLayout() {
       <Stack.Screen name="login" options={{ title: 'Acceso del barbero · Turnia' }} />
       <Stack.Screen name="registro" options={{ title: 'Registro · Turnia' }} />
       <Stack.Screen name="panel" options={{ title: 'Agenda del barbero · Turnia' }} />
+      <Stack.Screen name="servicios" options={{ title: 'Servicios · Turnia' }} />
       <Stack.Screen name="turno" options={{ title: 'Detalle del turno · Turnia' }} />
     </Stack>
   )

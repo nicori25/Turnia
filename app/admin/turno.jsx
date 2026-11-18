@@ -42,6 +42,7 @@ export default function Turno() {
         <>
           <Card>
             <Status status={booking.status} />
+            {!agenda.demo && <Text selectable style={styles.caption}>Código de turno: {booking.id}</Text>}
             <Text style={styles.sectionTitle}>{booking.name}</Text>
             <Text style={styles.body}>{booking.service}{booking.vip ? ' · Prioridad VIP' : ''}</Text>
             <Text style={styles.body}>{formatDate(booking.date)} · {booking.time} h</Text>

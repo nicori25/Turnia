@@ -3,12 +3,12 @@ import { useRouter } from 'expo-router'
 import ArrowRight from 'lucide-react-native/icons/arrow-right'
 import { BackLink, Button, Card, Field, Heading, Message, Screen } from './ui'
 import { supabase, useAuth } from '../domain/auth'
-import { useDemo } from '../domain/demo'
+import { useTurnia } from '../domain/turnia'
 
 export function AuthForm({ register = false }) {
   const router = useRouter()
   const { session } = useAuth()
-  const { setAdmin } = useDemo()
+  const { setAdmin } = useTurnia()
   const [businessName, setBusinessName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')

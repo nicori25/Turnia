@@ -1,3 +1,5 @@
+-- Referencia histórica de la versión Vue. Usar supabase/migrations para instalar Turnia.
+
 -- ============================================================
 -- Turnia — esquema de base de datos (Supabase / PostgreSQL)
 -- Pegar y correr en el SQL Editor del proyecto de Supabase.

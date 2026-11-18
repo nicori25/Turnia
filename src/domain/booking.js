@@ -13,7 +13,16 @@ export function localDate(date = new Date()) {
   return [date.getFullYear(), month, day].join('-')
 }
 
-export function upcomingDates(now = new Date()) {
+export function businessDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now)
+  return ['year', 'month', 'day'].map((type) => parts.find((part) => part.type === type).value).join('-')
+}
+
+export function upcomingDates(today = localDate()) {
+  const [year, month, date] = today.split('-').map(Number)
+  const now = new Date(year, month - 1, date, 12)
   return Array.from({ length: 7 }, (_, offset) => {
     const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
     return { key: localDate(day), weekday: offset === 0 ? 'Hoy' : new Intl.DateTimeFormat('es-AR', { weekday: 'short' }).format(day), day: day.getDate() }
@@ -27,7 +36,7 @@ export function formatDate(value) {
 }
 
 export function formatPrice(price) {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(price)
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(price)
 }
 
 function minutes(time) {
@@ -59,5 +68,7 @@ export function sampleBookings(date = localDate()) {
 
 export function validCustomer(name, phone) {
   const digits = phone.replace(/\D/g, '')
-  return name.trim().length >= 2 && /^[+\d ().-]+$/.test(phone) && digits.length >= 8 && digits.length <= 15
+  const length = Array.from(name.trim()).length
+  return length >= 2 && length <= 80 && phone.trim().length <= 24
+    && /^[+\d ().-]+$/.test(phone.trim()) && digits.length >= 8 && digits.length <= 15
 }

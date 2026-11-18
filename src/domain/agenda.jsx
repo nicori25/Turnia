@@ -1,17 +1,18 @@
 import { useCallback, useState } from 'react'
 import { useFocusEffect } from 'expo-router'
 import { supabase, useAuth } from './auth'
-import { useDemo } from './demo'
+import { useTurnia } from './turnia'
 
-const fields = 'id,hora,fecha,cliente_nombre,cliente_telefono,vip,precio_total,estado,servicios(nombre,duracion_min)'
+const fields = 'id,hora,fecha,cliente_nombre,cliente_telefono,vip,precio_total,estado,servicio_nombre,duracion_min'
 
 export function useAgenda({ date, id }) {
-  const demo = useDemo()
+  const demo = useTurnia()
   const { session, ready } = useAuth()
   const userId = session?.user.id
   const [records, setRecords] = useState([])
   const [loadedQuery, setLoadedQuery] = useState('')
   const [error, setError] = useState('')
+  const [revision, setRevision] = useState(0)
   const queryKey = [userId, date, id].join('|')
 
   useFocusEffect(useCallback(() => {
@@ -36,8 +37,8 @@ export function useAgenda({ date, id }) {
           vip: row.vip,
           price: row.precio_total,
           status: row.estado,
-          service: row.servicios?.nombre ?? 'Servicio',
-          duration: row.servicios?.duracion_min,
+          service: row.servicio_nombre,
+          duration: row.duracion_min,
         })))
       } catch {
         if (active) setError('No pudimos cargar la agenda. Volvé a abrir la pantalla para reintentar.')
@@ -48,7 +49,7 @@ export function useAgenda({ date, id }) {
 
     load()
     return () => { active = false }
-  }, [date, demo.admin, id, queryKey, userId]))
+  }, [date, demo.admin, id, queryKey, revision, userId]))
 
   async function changeStatus(bookingId, status) {
     if (demo.admin) {
@@ -73,6 +74,7 @@ export function useAgenda({ date, id }) {
     loading: !demo.admin && !!userId && !!(date || id) && loadedQuery !== queryKey,
     records: demo.admin ? demoRecords : loadedQuery === queryKey && !error ? records : [],
     error: demo.admin || loadedQuery !== queryKey ? '' : error,
+    refresh: () => setRevision((value) => value + 1),
     changeStatus,
     leave: demo.admin ? () => demo.setAdmin(false) : async () => {
       const { error } = await supabase.auth.signOut()

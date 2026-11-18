@@ -1,20 +1,20 @@
 import { StyleSheet, Text, View } from 'react-native'
 import { Card, colors, styles } from './ui'
-import { formatDate, formatPrice, vipSurcharge } from '../domain/booking'
+import { formatDate, formatPrice } from '../domain/booking'
 
-export function BookingSummary({ service, date, time, vip, price }) {
+export function BookingSummary({ service, date, time, surcharge = 0, price }) {
   return (
     <Card>
       <Text accessibilityRole="header" style={styles.sectionTitle}>Resumen del turno</Text>
       <View style={summary.row}>
         <Text style={styles.body}>{service}</Text>
-        <Text style={styles.body}>{formatPrice(price - (vip ? vipSurcharge : 0))}</Text>
+        <Text style={styles.body}>{formatPrice(price - surcharge)}</Text>
       </View>
       <Text style={styles.body}>{formatDate(date)} · {time} h</Text>
-      {vip && (
+      {surcharge > 0 && (
         <View style={summary.row}>
           <Text style={styles.body}>Prioridad VIP</Text>
-          <Text style={styles.body}>{formatPrice(vipSurcharge)}</Text>
+          <Text style={styles.body}>{formatPrice(surcharge)}</Text>
         </View>
       )}
       <View style={[summary.row, summary.total]}>

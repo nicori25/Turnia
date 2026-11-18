@@ -1,11 +1,13 @@
-import { useRouter } from 'expo-router'
+import { useCallback, useState } from 'react'
+import { useFocusEffect, useRouter } from 'expo-router'
 import ArrowRight from 'lucide-react-native/icons/arrow-right'
 import Check from 'lucide-react-native/icons/check'
 import Sparkles from 'lucide-react-native/icons/sparkles'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { BackLink, Button, Card, colors, Heading, Screen, styles } from '../src/components/ui'
-import { formatPrice, services, slotAvailable, timeSlots, upcomingDates, vipSurcharge } from '../src/domain/booking'
-import { useDemo } from '../src/domain/demo'
+import { BackLink, Button, Card, colors, Heading, Message, Screen, styles } from '../src/components/ui'
+import { businessDate, formatPrice, slotAvailable, timeSlots, upcomingDates } from '../src/domain/booking'
+import { loadAvailability } from '../src/domain/reservations'
+import { useTurnia } from '../src/domain/turnia'
 
 function Option({ selected, disabled = false, onPress, label, children, compact = false }) {
   return (
@@ -19,18 +21,42 @@ function Option({ selected, disabled = false, onPress, label, children, compact 
 }
 
 export default function Reserve() {
-  const { draft, updateDraft, bookings } = useDemo()
+  const { live, catalog, catalogError, reloadCatalog, draft, updateDraft, bookings } = useTurnia()
   const router = useRouter()
   const { width } = useWindowDimensions()
-  const dates = upcomingDates()
+  const [availability, setAvailability] = useState(null)
+  const [revision, setRevision] = useState(0)
+  const dates = upcomingDates(live ? catalog?.today ?? businessDate() : undefined)
   const date = dates.some(({ key }) => key === draft.date) ? draft.date : dates[0].key
+  const catalogServices = catalog?.services ?? []
+  const barbers = Array.from(new Map(catalogServices.map((item) => [item.barberId, item.business])))
+  const barberId = barbers.some(([id]) => id === draft.barberId) ? draft.barberId : barbers[0]?.[0]
+  const services = catalogServices.filter((item) => item.barberId === barberId)
   const service = services.find(({ id }) => id === draft.serviceId)
-  const available = (time) => slotAvailable(bookings, date, time, service?.duration ?? 30)
+  const serviceId = service?.id
+  const requestKey = serviceId + ':' + date + ':' + revision
+  const result = availability?.key === requestKey ? availability : null
+  const times = live ? result?.times ?? [] : timeSlots
+  const available = (time) => live
+    ? times.includes(time)
+    : slotAvailable(bookings, date, time, service?.duration ?? 30)
   const canContinue = !!service && available(draft.time)
+  const surcharge = catalog?.surcharge ?? 0
+
+  useFocusEffect(useCallback(() => {
+    if (!live || !serviceId) return
+    const controller = new AbortController()
+    setAvailability(null)
+    loadAvailability(serviceId, date, controller.signal).then(
+      (times) => { if (!controller.signal.aborted) setAvailability({ key: requestKey, times }) },
+      () => { if (!controller.signal.aborted) setAvailability({ key: requestKey, error: true }) },
+    )
+    return () => controller.abort()
+  }, [date, live, requestKey, serviceId]))
 
   function next() {
     if (!canContinue) return
-    updateDraft({ date })
+    updateDraft({ date, barberId })
     router.push('/confirmar')
   }
 
@@ -38,60 +64,93 @@ export default function Reserve() {
     <Screen>
       <BackLink href="/" children="Inicio" />
       <Heading label="Reserva · 1 de 3" title="Elegí tu turno" subtitle="Seleccioná un servicio, una fecha y un horario." />
-      <View style={[booking.columns, width >= 770 && booking.columnsWide]}>
-        <Card style={booking.services}>
-          <Text accessibilityRole="header" style={styles.sectionTitle}>Servicio</Text>
-          {services.map((item) => (
-            <Option key={item.id} label={item.name} selected={item.id === service?.id}
-              onPress={() => updateDraft({ serviceId: item.id, time: '' })}>
-              <View style={booking.row}>
-                <View style={booking.optionText}>
-                  <Text style={booking.name}>{item.name}</Text>
-                  <Text style={styles.caption}>{item.duration} min</Text>
-                </View>
-                <Text style={booking.price}>{formatPrice(item.price)}</Text>
-              </View>
+      {catalogError && (
+        <>
+          <Message error>No pudimos cargar los servicios.</Message>
+          <Button onPress={reloadCatalog} variant="outline">Reintentar</Button>
+        </>
+      )}
+      {!catalog && !catalogError && <Message>Cargando servicios…</Message>}
+      {catalog && !catalogServices.length && <Message>Todavía no hay servicios habilitados para reservar.</Message>}
+      {barbers.length > 1 && (
+        <Card>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>Barbería</Text>
+          {barbers.map(([id, name]) => (
+            <Option key={id} label={name} selected={id === barberId}
+              onPress={() => updateDraft({ barberId: id, serviceId: '', time: '' })}>
+              <Text style={booking.name}>{name}</Text>
             </Option>
           ))}
-          <Option label="Prioridad VIP" selected={draft.vip} onPress={() => updateDraft({ vip: !draft.vip })}>
-            <View style={booking.row}>
-              <Sparkles size={19} color={colors.green} />
-              <View style={booking.optionText}>
-                <Text style={booking.name}>Prioridad VIP</Text>
-                <Text style={styles.caption}>+ {formatPrice(vipSurcharge)}</Text>
+        </Card>
+      )}
+      {services.length > 0 && (
+        <>
+          <View style={[booking.columns, width >= 770 && booking.columnsWide]}>
+            <Card style={booking.services}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>Servicio</Text>
+              {services.map((item) => (
+                <Option key={item.id} label={item.name} selected={item.id === service?.id}
+                  onPress={() => updateDraft({ barberId, serviceId: item.id, time: '' })}>
+                  <View style={booking.row}>
+                    <View style={booking.optionText}>
+                      <Text style={booking.name}>{item.name}</Text>
+                      <Text style={styles.caption}>{item.duration} min</Text>
+                    </View>
+                    <Text style={booking.price}>{formatPrice(item.price)}</Text>
+                  </View>
+                </Option>
+              ))}
+              <Option label="Prioridad VIP" selected={draft.vip} onPress={() => updateDraft({ vip: !draft.vip })}>
+                <View style={booking.row}>
+                  <Sparkles size={19} color={colors.green} />
+                  <View style={booking.optionText}>
+                    <Text style={booking.name}>Prioridad VIP</Text>
+                    <Text style={styles.caption}>+ {formatPrice(surcharge)}</Text>
+                  </View>
+                  {draft.vip && <Check size={17} color={colors.green} />}
+                </View>
+              </Option>
+            </Card>
+            <Card style={booking.calendar}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>Fecha</Text>
+              <View style={booking.options}>
+                {dates.map((item) => (
+                  <Option key={item.key} compact label={item.weekday + ' ' + item.day}
+                    selected={item.key === date} onPress={() => updateDraft({ date: item.key, time: '' })}>
+                    <Text style={styles.caption}>{item.weekday}</Text>
+                    <Text style={booking.name}>{item.day}</Text>
+                  </Option>
+                ))}
               </View>
-              {draft.vip && <Check size={17} color={colors.green} />}
-            </View>
-          </Option>
-        </Card>
-        <Card style={booking.calendar}>
-          <Text accessibilityRole="header" style={styles.sectionTitle}>Fecha</Text>
-          <View style={booking.options}>
-            {dates.map((item) => (
-              <Option key={item.key} compact label={item.weekday + ' ' + item.day}
-                selected={item.key === date} onPress={() => updateDraft({ date: item.key, time: '' })}>
-                <Text style={styles.caption}>{item.weekday}</Text>
-                <Text style={booking.name}>{item.day}</Text>
-              </Option>
-            ))}
+              <Text accessibilityRole="header" style={styles.sectionTitle}>Horario</Text>
+              <View style={booking.options}>
+                {times.map((time) => (
+                  <Option key={time} compact label={time} disabled={!available(time)}
+                    selected={time === draft.time} onPress={() => updateDraft({ date, time })}>
+                    <Text style={booking.name}>{time}</Text>
+                  </Option>
+                ))}
+              </View>
+              {live && !service && <Text style={styles.caption}>Elegí un servicio para consultar sus horarios.</Text>}
+              {live && service && !result && <Text style={styles.caption}>Cargando disponibilidad…</Text>}
+              {result?.error && (
+                <>
+                  <Message error>No pudimos consultar los horarios.</Message>
+                  <Button onPress={() => setRevision((value) => value + 1)} variant="outline">Reintentar</Button>
+                </>
+              )}
+              {(!live || result?.times) && !times.some(available) && (
+                <Text style={styles.caption}>Elegí otra fecha para ver más horarios.</Text>
+              )}
+            </Card>
           </View>
-          <Text accessibilityRole="header" style={styles.sectionTitle}>Horario</Text>
-          <View style={booking.options}>
-            {timeSlots.map((time) => (
-              <Option key={time} compact label={time} disabled={!available(time)}
-                selected={time === draft.time} onPress={() => updateDraft({ date, time })}>
-                <Text style={booking.name}>{time}</Text>
-              </Option>
-            ))}
+          <View style={booking.total}>
+            <Text style={styles.body}>Total</Text>
+            <Text style={booking.totalPrice}>{service ? formatPrice(service.price + (draft.vip ? surcharge : 0)) : '—'}</Text>
           </View>
-          {!timeSlots.some(available) && <Text style={styles.caption}>Elegí otra fecha para ver más horarios.</Text>}
-        </Card>
-      </View>
-      <View style={booking.total}>
-        <Text style={styles.body}>Total</Text>
-        <Text style={booking.totalPrice}>{service ? formatPrice(service.price + (draft.vip ? vipSurcharge : 0)) : '—'}</Text>
-      </View>
-      <Button onPress={next} disabled={!canContinue} icon={ArrowRight}>Continuar</Button>
+          <Button onPress={next} disabled={!canContinue} icon={ArrowRight}>Continuar</Button>
+        </>
+      )}
     </Screen>
   )
 }
