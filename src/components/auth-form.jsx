@@ -23,6 +23,23 @@ export function AuthForm({ register = false }) {
     router.replace('/admin/panel')
   }
 
+  async function openAgenda(activeSession) {
+    try {
+      const { data, error } = await supabase.rpc('preparar_cuenta_turnia', {
+        p_nombre: activeSession.user.user_metadata?.business_name ?? null,
+      })
+      if (error) throw error
+      if (!data) {
+        setError('Tu cuenta todavía no tiene un perfil de Turnia.')
+        return
+      }
+      setAdmin(false)
+      router.replace('/admin/panel')
+    } catch {
+      setError('No pudimos preparar tu agenda. Intentá nuevamente.')
+    }
+  }
+
   async function submit() {
     if (!supabase || !valid || busy) return
     setBusy(true)
@@ -36,8 +53,7 @@ export function AuthForm({ register = false }) {
       if (error) {
         setError(register ? 'No pudimos crear la cuenta. Revisá los datos e intentá de nuevo.' : 'No pudimos iniciar sesión. Revisá tus credenciales.')
       } else if (data.session) {
-        setAdmin(false)
-        router.replace('/admin/panel')
+        await openAgenda(data.session)
       } else {
         setNotice('Revisá tu correo para confirmar el registro. Después podés iniciar sesión.')
       }
@@ -67,7 +83,7 @@ export function AuthForm({ register = false }) {
               {busy ? 'Procesando…' : register ? 'Registrarme' : 'Entrar'}
             </Button>
             {!register && session && (
-              <Button onPress={() => { setAdmin(false); router.replace('/admin/panel') }} variant="outline">
+              <Button onPress={() => openAgenda(session)} variant="outline" disabled={busy}>
                 Abrir mi agenda
               </Button>
             )}

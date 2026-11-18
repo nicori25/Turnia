@@ -3,8 +3,6 @@ import { useFocusEffect } from 'expo-router'
 import { supabase, useAuth } from './auth'
 import { useTurnia } from './turnia'
 
-const fields = 'id,hora,fecha,cliente_nombre,cliente_telefono,vip,precio_total,estado,servicio_nombre,duracion_min'
-
 export function useAgenda({ date, id }) {
   const demo = useTurnia()
   const { session, ready } = useAuth()
@@ -23,9 +21,10 @@ export function useAgenda({ date, id }) {
 
     async function load() {
       try {
-        let query = supabase.from('turnos').select(fields).eq('barbero_id', userId)
-        query = date ? query.eq('fecha', date).order('hora') : query.eq('id', id)
-        const { data, error } = await query
+        const { data, error } = await supabase.rpc('mi_agenda_turnia', {
+          p_fecha: date ?? null,
+          p_turno_id: id || null,
+        })
         if (error) throw error
         if (!active) return
         setRecords(data.map((row) => ({
@@ -39,6 +38,7 @@ export function useAgenda({ date, id }) {
           status: row.estado,
           service: row.servicio_nombre,
           duration: row.duracion_min,
+          professional: row.profesional,
         })))
       } catch {
         if (active) setError('No pudimos cargar la agenda. Volvé a abrir la pantalla para reintentar.')
@@ -56,10 +56,8 @@ export function useAgenda({ date, id }) {
       demo.setStatus(bookingId, status)
       return
     }
-    const { data, error } = await supabase.from('turnos').update({ estado: status }).eq('id', bookingId)
-      .eq('barbero_id', userId).in('estado', status === 'confirmado' ? ['pendiente'] : ['pendiente', 'confirmado'])
-      .select('id')
-    if (error || !data?.length) throw new Error('No se pudo actualizar el turno.')
+    const { data, error } = await supabase.rpc('cambiar_estado_turnia', { p_turno_id: bookingId, p_estado: status })
+    if (error || !data) throw new Error('No se pudo actualizar el turno.')
     setRecords((current) => current.map((booking) => booking.id === bookingId ? { ...booking, status } : booking))
   }
 

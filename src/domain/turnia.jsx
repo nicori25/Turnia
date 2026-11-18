@@ -5,9 +5,9 @@ import { localDate, sampleBookings, services, slotAvailable, validCustomer, vipS
 import { loadCatalog, saveReservation } from './reservations'
 
 const Turnia = createContext(null)
-const initialDraft = { barberId: '', serviceId: '', date: '', time: '', vip: false }
+const initialDraft = { professionalId: '', serviceId: '', date: '', time: '', vip: false }
 const demoCatalog = {
-  services: services.map((service) => ({ ...service, barberId: 'demo', business: 'Martín Barber Studio' })),
+  services: services.map((service) => ({ ...service, professionalId: 'demo', business: 'Martín Barber Studio' })),
   surcharge: vipSurcharge,
 }
 const live = !!supabase
@@ -56,7 +56,7 @@ export function TurniaProvider({ children }) {
     request.current = null
     setDraft({
       ...initialDraft,
-      barberId: service?.barberId ?? '',
+      professionalId: service?.professionalId ?? '',
       serviceId: service?.id ?? '',
       date: catalog?.today ?? localDate(),
     })
@@ -78,8 +78,8 @@ export function TurniaProvider({ children }) {
       if (request.current?.signature !== signature) request.current = { signature, id: randomUUID() }
       const currentRequest = request.current
       try {
-        const booking = await saveReservation({ requestId: currentRequest.id, draft, name, phone, price })
-        if (request.current === currentRequest) setReceipt({ ...booking, name: name.trim(), surcharge })
+        const booking = await saveReservation({ requestId: currentRequest.id, service, draft, name, phone, price })
+        if (request.current === currentRequest) setReceipt({ ...booking, name: name.trim(), professional: service.professional, business: service.business, surcharge })
         return ''
       } catch (error) {
         if (error.message === 'PRECIO_CAMBIO' || error.message === 'SERVICIO_NO_DISPONIBLE') reloadCatalog()

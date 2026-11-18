@@ -46,7 +46,7 @@ export default function ConfirmData() {
       <Heading label="Reserva · 2 de 3" title="Completá tus datos" subtitle={live ? 'La barbería usará estos datos para gestionar tu turno.'
           : 'Usá un nombre y un teléfono de prueba para esta demostración.'} />
       <BookingSummary service={service.name} date={draft.date} time={draft.time}
-        surcharge={surcharge} price={service.price + surcharge} />
+        professional={service.professional} business={service.business} surcharge={surcharge} price={service.price + surcharge} />
       <Card>
         <Field label="Nombre" value={name} onChangeText={setName} placeholder="Ej. Alex Pérez" maxLength={80} editable={!busy} />
         <Field label="Teléfono" value={phone} onChangeText={setPhone} keyboardType="phone-pad"

@@ -35,11 +35,13 @@ Las reservas y los cambios de la demo viven en memoria. La agenda de prueba y el
 3. Registrá una cuenta de barbero. Si está habilitada la confirmación por correo, configurá las URL de redirección en Supabase y validá la cuenta antes del primer ingreso.
 4. Desde **Agenda de turnos → Administrar servicios**, cargá los servicios, sus duraciones y precios. Los servicios activos aparecen en el catálogo. Una vez hecha una reserva, abrí la fecha correspondiente en la agenda o usá **Actualizar agenda** si ya la tenías abierta.
 
-Sin las variables de Supabase, la app abre la demostración local. Con las variables definidas, muestra el catálogo y la disponibilidad de la base configurada. Los turnos se ofrecen durante siete días en la zona horaria de Buenos Aires. Cada barbero recibe seis horarios diarios iniciales, modificables en la tabla `turnia_private.horarios`.
+Sin las variables de Supabase, la app abre la demostración local. Con las variables definidas, muestra el catálogo y la disponibilidad de la base configurada. Los turnos se ofrecen durante siete días en la zona horaria de Buenos Aires. Cada profesional tiene seis horarios diarios iniciales, configurables mediante `turnia_private.horarios`.
 
 El cálculo del total, el recargo VIP y la detección de superposiciones se ejecutan en PostgreSQL. Una confirmación de cliente crea una solicitud pendiente con su código. El barbero puede confirmarla o cancelarla. La cancelación libera el horario.
 
-Si una instalación viene del esquema Vue, respaldá sus datos antes de la migración. La migración conserva los registros y completa la duración histórica a partir del servicio asociado, o con 30 minutos si ese dato falta. Si hay turnos activos superpuestos, revisalos antes de volver a ejecutar la migración.
+La migración admite una base nueva y el esquema existente de organizaciones, perfiles, profesionales, servicios, clientes y turnos. Los servicios con profesional asignado se ofrecen con esa persona. Los servicios compartidos quedan disponibles para los profesionales activos de su organización. El administrador gestiona la agenda de su organización y un profesional gestiona su propia agenda. Las políticas existentes se conservan y se deben revisar antes de habilitar la web publicada.
+
+En un proyecto con datos, hacé un respaldo y verificá que los turnos activos no se superpongan. La migración conserva los registros y agrega la duración histórica a partir del servicio asociado, con 30 minutos cuando falta ese dato. La versión anterior de esta migración era un prototipo de una sola barbería. Si la instalaste en una instancia local descartable, reiniciá esa instancia antes de probar esta versión.
 
 ### Prueba de integración de reservas
 

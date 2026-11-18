@@ -44,7 +44,7 @@ export default function Turno() {
             <Status status={booking.status} />
             {!agenda.demo && <Text selectable style={styles.caption}>Código de turno: {booking.id}</Text>}
             <Text style={styles.sectionTitle}>{booking.name}</Text>
-            <Text style={styles.body}>{booking.service}{booking.vip ? ' · Prioridad VIP' : ''}</Text>
+            <Text style={styles.body}>{[booking.service, booking.professional, booking.vip && 'Prioridad VIP'].filter(Boolean).join(' · ')}</Text>
             <Text style={styles.body}>{formatDate(booking.date)} · {booking.time} h</Text>
             {booking.phone ? <Text style={styles.body}>Teléfono: {booking.phone}</Text> : null}
             <Text style={styles.sectionTitle}>Total: {formatPrice(booking.price)}</Text>

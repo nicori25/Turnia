@@ -65,7 +65,7 @@ export default function Home() {
             const Icon = serviceIcons[index]
             return (
               <Pressable key={service.id} accessibilityRole="button"
-                accessibilityLabel={`Reservar ${service.name}, ${service.duration} minutos, ${formatPrice(service.price)}${live ? ', ' + service.business : ''}`}
+                accessibilityLabel={`Reservar ${service.name}, ${service.duration} minutos, ${formatPrice(service.price)}${live ? ', ' + service.professional + ', ' + service.business : ''}`}
                 onPress={() => book(service)}
                 style={({ hovered, pressed }) => [home.service, (hovered || pressed) && home.serviceActive]}>
                 <View style={home.serviceHeader}>
@@ -73,7 +73,7 @@ export default function Home() {
                   <ChevronRight size={19} color={colors.muted} />
                 </View>
                 <Text style={home.serviceName}>{service.name}</Text>
-                <Text style={styles.caption}>{live ? service.business : service.description}</Text>
+                <Text style={styles.caption}>{live ? service.professional + ' · ' + service.business : service.description}</Text>
                 <View style={home.serviceMeta}>
                   <Text style={home.price}>{formatPrice(service.price)}</Text>
                   <View style={home.duration}>

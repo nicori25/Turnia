@@ -7,9 +7,12 @@ export async function loadCatalog(signal) {
     today: data.fecha_local,
     surcharge: Number(data.recargo_vip),
     services: data.servicios.map((item) => ({
-      id: item.id,
-      barberId: item.barbero_id,
-      business: item.barberia,
+      id: item.profesional_id + ':' + item.id,
+      serviceId: item.id,
+      professionalId: item.profesional_id,
+      professional: item.profesional,
+      business: item.organizacion,
+      description: item.descripcion,
       name: item.nombre,
       duration: item.duracion_min,
       price: Number(item.precio),
@@ -17,19 +20,21 @@ export async function loadCatalog(signal) {
   }
 }
 
-export async function loadAvailability(serviceId, date, signal) {
+export async function loadAvailability(serviceId, professionalId, date, signal) {
   const { data, error } = await supabase.rpc('horarios_disponibles', {
     p_servicio_id: serviceId,
+    p_profesional_id: professionalId,
     p_fecha: date,
   }).abortSignal(signal)
   if (error) throw error
   return data.map((time) => time.slice(0, 5))
 }
 
-export async function saveReservation({ requestId, draft, name, phone, price }) {
+export async function saveReservation({ requestId, service, draft, name, phone, price }) {
   const { data, error } = await supabase.rpc('reservar_turno', {
     p_solicitud_id: requestId,
-    p_servicio_id: draft.serviceId,
+    p_servicio_id: service.serviceId,
+    p_profesional_id: service.professionalId,
     p_fecha: draft.date,
     p_hora: draft.time,
     p_vip: draft.vip,

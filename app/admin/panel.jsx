@@ -75,7 +75,7 @@ export default function Panel() {
               <Text style={panel.time}>{booking.time}</Text>
               <View style={panel.customer}>
                 <Text style={styles.sectionTitle}>{booking.name}</Text>
-                <Text style={styles.caption}>{booking.service}{booking.vip ? ' · VIP' : ''}</Text>
+                <Text style={styles.caption}>{[booking.service, booking.professional, booking.vip && 'VIP'].filter(Boolean).join(' · ')}</Text>
                 <Status status={booking.status} />
               </View>
               <ChevronRight size={18} color={colors.muted} />

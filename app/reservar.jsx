@@ -29,12 +29,12 @@ export default function Reserve() {
   const dates = upcomingDates(live ? catalog?.today ?? businessDate() : undefined)
   const date = dates.some(({ key }) => key === draft.date) ? draft.date : dates[0].key
   const catalogServices = catalog?.services ?? []
-  const barbers = Array.from(new Map(catalogServices.map((item) => [item.barberId, item.business])))
-  const barberId = barbers.some(([id]) => id === draft.barberId) ? draft.barberId : barbers[0]?.[0]
-  const services = catalogServices.filter((item) => item.barberId === barberId)
+  const professionals = Array.from(new Map(catalogServices.map((item) => [item.professionalId, item.professional + ' · ' + item.business])))
+  const professionalId = professionals.some(([id]) => id === draft.professionalId) ? draft.professionalId : professionals[0]?.[0]
+  const services = catalogServices.filter((item) => item.professionalId === professionalId)
   const service = services.find(({ id }) => id === draft.serviceId)
-  const serviceId = service?.id
-  const requestKey = serviceId + ':' + date + ':' + revision
+  const serviceId = service?.serviceId
+  const requestKey = draft.serviceId + ':' + date + ':' + revision
   const result = availability?.key === requestKey ? availability : null
   const times = live ? result?.times ?? [] : timeSlots
   const available = (time) => live
@@ -47,16 +47,16 @@ export default function Reserve() {
     if (!live || !serviceId) return
     const controller = new AbortController()
     setAvailability(null)
-    loadAvailability(serviceId, date, controller.signal).then(
+    loadAvailability(serviceId, professionalId, date, controller.signal).then(
       (times) => { if (!controller.signal.aborted) setAvailability({ key: requestKey, times }) },
       () => { if (!controller.signal.aborted) setAvailability({ key: requestKey, error: true }) },
     )
     return () => controller.abort()
-  }, [date, live, requestKey, serviceId]))
+  }, [date, live, professionalId, requestKey, serviceId]))
 
   function next() {
     if (!canContinue) return
-    updateDraft({ date, barberId })
+    updateDraft({ date, professionalId })
     router.push('/confirmar')
   }
 
@@ -72,12 +72,12 @@ export default function Reserve() {
       )}
       {!catalog && !catalogError && <Message>Cargando servicios…</Message>}
       {catalog && !catalogServices.length && <Message>Todavía no hay servicios habilitados para reservar.</Message>}
-      {barbers.length > 1 && (
+      {live && professionals.length > 0 && (
         <Card>
-          <Text accessibilityRole="header" style={styles.sectionTitle}>Barbería</Text>
-          {barbers.map(([id, name]) => (
-            <Option key={id} label={name} selected={id === barberId}
-              onPress={() => updateDraft({ barberId: id, serviceId: '', time: '' })}>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>Profesional</Text>
+          {professionals.map(([id, name]) => (
+            <Option key={id} label={name} selected={id === professionalId}
+              onPress={() => updateDraft({ professionalId: id, serviceId: '', time: '' })}>
               <Text style={booking.name}>{name}</Text>
             </Option>
           ))}
@@ -90,11 +90,12 @@ export default function Reserve() {
               <Text accessibilityRole="header" style={styles.sectionTitle}>Servicio</Text>
               {services.map((item) => (
                 <Option key={item.id} label={item.name} selected={item.id === service?.id}
-                  onPress={() => updateDraft({ barberId, serviceId: item.id, time: '' })}>
+                  onPress={() => updateDraft({ professionalId, serviceId: item.id, time: '' })}>
                   <View style={booking.row}>
                     <View style={booking.optionText}>
                       <Text style={booking.name}>{item.name}</Text>
                       <Text style={styles.caption}>{item.duration} min</Text>
+                      {item.description && <Text style={styles.caption}>{item.description}</Text>}
                     </View>
                     <Text style={booking.price}>{formatPrice(item.price)}</Text>
                   </View>

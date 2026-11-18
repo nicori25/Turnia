@@ -26,8 +26,8 @@ async function call(url, { method = 'GET', payload, token, headers } = {}) {
   return { status: response.status, body: content ? JSON.parse(content) : null }
 }
 
-function rpc(name, payload = {}) {
-  return call(rest + '/rpc/' + name, { method: 'POST', payload })
+function rpc(name, payload = {}, token) {
+  return call(rest + '/rpc/' + name, { method: 'POST', payload, token })
 }
 
 async function register(label) {
@@ -42,22 +42,31 @@ async function register(label) {
   const login = await call(auth + '/token?grant_type=password', { method: 'POST', payload: { email, password } })
   assert.equal(login.status, 200, login.body?.msg ?? 'Habilitá el registro local y desactivá la confirmación por correo para esta prueba.')
   assert(login.body.access_token)
-  return { id: body.user.id, token: login.body.access_token }
+  const token = login.body.access_token
+  assert.equal((await rpc('preparar_cuenta_turnia', { p_nombre: label }, token)).body, true)
+  assert.equal((await rpc('preparar_cuenta_turnia', { p_nombre: 'Otro nombre' }, token)).body, true)
+  return { id: body.user.id, token }
+}
+
+function saveService(barber, values) {
+  return rpc('guardar_servicio_turnia', {
+    p_id: null, p_nombre: null, p_duracion_min: null, p_precio: null, p_activo: null, ...values,
+  }, barber.token)
 }
 
 async function service(barber, name, duration, price) {
-  const { status, body } = await call(rest + '/servicios?select=id', {
-    token: barber.token, method: 'POST', headers: { Prefer: 'return=representation' },
-    payload: { barbero_id: barber.id, nombre: name, duracion_min: duration, precio: price },
-  })
-  assert.equal(status, 201, body?.message)
-  return body[0].id
+  const { status, body } = await saveService(barber, { p_nombre: name, p_duracion_min: duration, p_precio: price })
+  assert.equal(status, 200, body?.message)
+  assert.equal(typeof body, 'string')
+  return body
 }
 
 function changeStatus(turnId, barber, estado) {
-  return call(rest + '/turnos?id=eq.' + turnId + '&select=id,estado', {
-    method: 'PATCH', token: barber.token, payload: { estado }, headers: { Prefer: 'return=representation' },
-  })
+  return rpc('cambiar_estado_turnia', { p_turno_id: turnId, p_estado: estado }, barber.token)
+}
+
+function agenda(turnId, barber) {
+  return rpc('mi_agenda_turnia', { p_turno_id: turnId, p_fecha: null }, barber?.token)
 }
 
 const first = await register('Barbería de prueba A')
@@ -69,14 +78,18 @@ const other = await service(second, 'Corte alternativo', 30, 3600)
 const catalog = await rpc('catalogo_turnia')
 assert.equal(catalog.status, 200)
 assert.equal(catalog.body.recargo_vip, 1500)
-assert(catalog.body.servicios.some(({ id, barbero_id }) => id === long && barbero_id === first.id))
-assert.deepEqual(Object.keys(catalog.body.servicios.find(({ id }) => id === long)).sort(),
-  ['barberia', 'barbero_id', 'duracion_min', 'id', 'nombre', 'precio'])
+const firstOffering = catalog.body.servicios.find(({ id }) => id === long)
+const secondOffering = catalog.body.servicios.find(({ id }) => id === other)
+assert.equal(firstOffering.organizacion, 'Barbería de prueba A')
+assert.notEqual(firstOffering.organizacion_id, secondOffering.organizacion_id)
+assert.deepEqual(Object.keys(firstOffering).sort(),
+  ['descripcion', 'duracion_min', 'id', 'nombre', 'organizacion', 'organizacion_id', 'precio', 'profesional', 'profesional_id'])
 
 const tomorrow = new Date(catalog.body.fecha_local + 'T12:00:00Z')
 tomorrow.setUTCDate(tomorrow.getUTCDate() + 1)
 const date = tomorrow.toISOString().slice(0, 10)
-const availability = (id = long, day = date) => rpc('horarios_disponibles', { p_servicio_id: id, p_fecha: day })
+const availability = (id = long, day = date, professional = firstOffering.profesional_id) =>
+  rpc('horarios_disponibles', { p_servicio_id: id, p_profesional_id: professional, p_fecha: day })
 
 const free = await availability()
 assert.equal(free.status, 200, free.body?.message)
@@ -87,6 +100,7 @@ const book = (payload) => rpc('reservar_turno', payload)
 const booking = {
   p_solicitud_id: randomUUID(),
   p_servicio_id: long,
+  p_profesional_id: firstOffering.profesional_id,
   p_fecha: date,
   p_hora: '10:00',
   p_vip: true,
@@ -99,8 +113,8 @@ assert.equal((await book({ ...booking, p_precio_esperado: 1 })).body.message, 'P
 assert.equal((await book({ ...booking, p_cliente_telefono: 'texto' })).body.message, 'DATOS_INVALIDOS')
 assert.equal((await book({ ...booking, p_hora: '10:15' })).body.message, 'HORARIO_NO_DISPONIBLE')
 assert.equal((await book({ ...booking, p_fecha: '2099-01-01' })).body.message, 'HORARIO_NO_DISPONIBLE')
-assert.equal((await call(rest + '/turnos')).status, 401)
-assert.equal((await call(rest + '/turnos', { method: 'POST', token: first.token, payload: { barbero_id: first.id } })).status, 403)
+assert.deepEqual((await availability(long, date, secondOffering.profesional_id)).body, [])
+assert.equal((await book({ ...booking, p_profesional_id: secondOffering.profesional_id })).body.message, 'SERVICIO_NO_DISPONIBLE')
 
 const overlapping = {
   ...booking, p_solicitud_id: randomUUID(), p_servicio_id: short,
@@ -119,33 +133,33 @@ assert(!((await availability(long)).body.includes('10:00:00')))
 const retry = await Promise.all([book(winningRequest), book(winningRequest)])
 assert.deepEqual(retry.map(({ body }) => body.id), [success.id, success.id])
 assert.equal((await book({ ...winningRequest, p_cliente_nombre: 'Otro cliente ficticio' })).body.message, 'SOLICITUD_INVALIDA')
-const ownRow = await call(rest + '/turnos?id=eq.' + success.id, { token: first.token })
+const ownRow = await agenda(success.id, first)
 assert.equal(ownRow.body[0].cliente_nombre, 'Cliente ficticio')
-assert.deepEqual((await call(rest + '/turnos?id=eq.' + success.id, { token: second.token })).body, [])
-assert.deepEqual((await changeStatus(success.id, second, 'cancelado')).body, [])
-assert.equal((await changeStatus(success.id, first, 'confirmado')).body[0].estado, 'confirmado')
-assert.equal((await changeStatus(success.id, first, 'cancelado')).body[0].estado, 'cancelado')
-assert.deepEqual((await changeStatus(success.id, first, 'confirmado')).body, [])
+assert([401, 403, 404].includes((await agenda(success.id)).status))
+assert.deepEqual((await agenda(success.id, second)).body, [])
+assert.equal((await changeStatus(success.id, second, 'cancelado')).body, false)
+assert.equal((await changeStatus(success.id, first, 'confirmado')).body, true)
+assert.equal((await changeStatus(success.id, first, 'cancelado')).body, true)
+assert.equal((await agenda(success.id, first)).body[0].estado, 'cancelado')
+assert.equal((await changeStatus(success.id, first, 'confirmado')).body, false)
 assert((await availability(long)).body.includes('10:00:00'))
 
 const otherBarber = await book({
-  ...booking, p_solicitud_id: randomUUID(), p_servicio_id: other, p_vip: false, p_precio_esperado: 3600,
+  ...booking, p_solicitud_id: randomUUID(), p_servicio_id: other, p_profesional_id: secondOffering.profesional_id, p_vip: false, p_precio_esperado: 3600,
 })
 assert.equal(otherBarber.status, 200)
 const newRequest = { ...booking, p_solicitud_id: randomUUID() }
 const newReservation = await book(newRequest)
 assert.equal(newReservation.status, 200)
-const edit = await call(rest + '/servicios?id=eq.' + long, {
-  method: 'PATCH', token: first.token, payload: { duracion_min: 10, precio: 7800 }, headers: { Prefer: 'return=representation' },
-})
-assert.equal(edit.status, 200)
+assert.equal((await saveService(second, { p_id: long, p_activo: false })).body, null)
+const edit = await saveService(first, { p_id: long, p_nombre: 'Corte ajustado', p_duracion_min: 10, p_precio: 7800 })
+assert.equal(edit.body, long)
 assert(!((await availability(short)).body.includes('11:00:00')))
 assert.equal((await book(newRequest)).body.precio_total, 6000.25)
 
-const pause = await call(rest + '/servicios?id=eq.' + long, {
-  method: 'PATCH', token: first.token, payload: { activo: false }, headers: { Prefer: 'return=representation' },
-})
-assert.equal(pause.body[0].activo, false)
+const pause = await saveService(first, { p_id: long, p_activo: false })
+assert.equal(pause.body, long)
+assert.equal((await rpc('mis_servicios_turnia', {}, first.token)).body.find(({ id }) => id === long).activo, false)
 assert(!((await rpc('catalogo_turnia')).body.servicios.some(({ id }) => id === long)))
 assert.deepEqual((await availability(long)).body, [])
 assert.equal((await book({ ...booking, p_solicitud_id: randomUUID(), p_hora: '16:00' })).body.message, 'SERVICIO_NO_DISPONIBLE')

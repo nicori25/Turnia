@@ -31,8 +31,7 @@ export default function Services() {
 
     async function load() {
       try {
-        const { data, error } = await supabase.from('servicios')
-          .select('id,nombre,duracion_min,precio,activo').eq('barbero_id', userId).order('nombre')
+        const { data, error } = await supabase.rpc('mis_servicios_turnia')
           .abortSignal(controller.signal)
         if (error) throw error
         if (!controller.signal.aborted) setEntries(data)
@@ -65,11 +64,14 @@ export default function Services() {
     setSaving(true)
     setFormError('')
     try {
-      const query = id
-        ? supabase.from('servicios').update(values).eq('id', id).eq('barbero_id', userId)
-        : supabase.from('servicios').insert({ ...values, barbero_id: userId })
-      const { error } = await query.select('id').single()
-      if (error) throw error
+      const { data, error } = await supabase.rpc('guardar_servicio_turnia', {
+        p_id: id,
+        p_nombre: values.nombre ?? null,
+        p_duracion_min: values.duracion_min ?? null,
+        p_precio: values.precio ?? null,
+        p_activo: values.activo ?? null,
+      })
+      if (error || !data) throw error ?? new Error('Servicio no disponible.')
       if (!id || id === editing) edit(null)
       setRevision((value) => value + 1)
       reloadCatalog()
@@ -97,7 +99,7 @@ export default function Services() {
       {entries.map((service) => (
         <Card key={service.id}>
           <Text style={styles.sectionTitle}>{service.nombre}</Text>
-          <Text style={styles.body}>{service.duracion_min} min · {formatPrice(service.precio)} · {service.activo ? 'Activo' : 'Pausado'}</Text>
+          <Text style={styles.body}>{service.duracion_min} min · {formatPrice(service.precio)} · {service.activo ? 'Activo' : 'Pausado'} · {service.profesional ?? 'Toda la organización'}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <Button variant="outline" disabled={saving} onPress={() => edit(service)}>Editar</Button>
             <Button variant="outline" disabled={saving} onPress={() => save({ activo: !service.activo }, service.id)}>
