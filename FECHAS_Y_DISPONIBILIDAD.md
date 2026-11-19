@@ -1,4 +1,7 @@
-# Fechas y disponibilidad de la demo
+# Fechas y disponibilidad
+
+Esta rama incorpora la integración persistente descrita en [Activar Supabase](CONECTAR_SUPABASE.md).
+La sección siguiente describe la implementación anterior en memoria, conservada como referencia.
 
 - El cliente elige servicio, fecha y horario. El cambio de fecha limpia la hora.
 - El reloj y el día de referencia usan `America/Argentina/Buenos_Aires`, sin

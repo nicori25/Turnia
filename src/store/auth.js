@@ -1,42 +1,38 @@
 import { reactive } from 'vue'
-import { supabase } from '../lib/supabaseClient'
+import { getSupabase, supabase } from '../lib/supabaseClient.js'
 
-// El barbero es quien tiene cuenta en Turnia; el cliente reserva sin
-// registrarse (ver el MVP del proyecto).
-export const authState = reactive({
-  user: null,
-  ready: false,
-})
-
-export async function initAuth() {
-  const { data } = await supabase.auth.getSession()
-  authState.user = data.session?.user ?? null
-  authState.ready = true
-
-  supabase.auth.onAuthStateChange((_event, session) => {
-    authState.user = session?.user ?? null
-  })
+export const authState = reactive({ user: null, ready: false, error: '' })
+let initialization
+export function initAuth() {
+  if (initialization) return initialization
+  initialization = (async () => {
+    try {
+      const client = getSupabase()
+      client.auth.onAuthStateChange((_event, session) => { authState.user = session?.user ?? null })
+      const { data, error } = await client.auth.getSession()
+      if (error) throw error
+      authState.user = data.session?.user ?? null
+    } catch {
+      authState.error = supabase ? 'No pudimos recuperar tu sesión. Volvé a iniciar sesión.' : 'Falta configurar Supabase.'
+    } finally { authState.ready = true }
+  })()
+  return initialization
 }
-
 export async function register({ email, password, businessName }) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { business_name: businessName } },
-  })
+  const { data, error } = await getSupabase().auth.signUp({ email, password,
+    options: { data: { business_name: businessName.trim() } } })
   if (error) throw error
-  authState.user = data.user
+  authState.user = data.session?.user ?? null
   return data
 }
-
 export async function login({ email, password }) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await getSupabase().auth.signInWithPassword({ email, password })
   if (error) throw error
-  authState.user = data.user
+  authState.user = data.session?.user ?? null
   return data
 }
-
 export async function logout() {
-  await supabase.auth.signOut()
+  const { error } = await getSupabase().auth.signOut()
+  if (error) throw error
   authState.user = null
 }

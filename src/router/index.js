@@ -1,5 +1,6 @@
+import { watch } from 'vue'
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
-import { authState } from '../store/auth'
+import { authState, initAuth } from '../store/auth'
 
 const routes = [
   {
@@ -55,9 +56,16 @@ const router = createRouter({
 })
 
 // Las pantallas del panel del barbero requieren sesión activa en Supabase.
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  if (to.meta.requiresAuth) await initAuth()
   if (to.meta.requiresAuth && !authState.user) {
     return { name: 'admin-login' }
+  }
+})
+
+watch(() => authState.user, (user) => {
+  if (authState.ready && !user && router.currentRoute.value.meta.requiresAuth) {
+    router.replace({ name: 'admin-login' })
   }
 })
 

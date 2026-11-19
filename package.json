@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/availability.test.js && node tests/supabase.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -14,6 +15,7 @@
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.17",
     "@vitejs/plugin-vue": "^5.0.0",
     "sass": "^1.75.0",
     "vite": "^5.2.0"

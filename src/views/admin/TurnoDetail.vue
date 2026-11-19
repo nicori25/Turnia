@@ -1,40 +1,41 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getTurno, isSlotAvailable, setEstado } from '../../store/turnos'
-import { formatDate } from '../../utils/dates'
+import { loadTurno, setEstado } from '../../store/turnos'
+import { formatDate, isFutureSlot } from '../../utils/dates'
 import { useClock } from '../../composables/useClock'
 
-const props = defineProps({ id: [String, Number] })
+const props = defineProps({ id: String })
 const router = useRouter()
-const turno = getTurno(props.id)
+const turno = ref(null)
 const error = ref('')
+const loading = ref(true)
+const saving = ref(false)
 const now = useClock()
-const canConfirm = computed(() => turno && turno.status === 'pendiente' &&
-  isSlotAvailable(turno.date, turno.time, now.value, turno.id))
-
-if (!turno) {
-  router.replace({ name: 'admin-panel' })
+const canConfirm = computed(() => turno.value && turno.value.status === 'pendiente' &&
+  isFutureSlot(turno.value.date, turno.value.time, now.value))
+async function refresh() {
+  loading.value = true; error.value = ''
+  try { turno.value = await loadTurno(props.id) } catch (e) { error.value = e.message }
+  finally { loading.value = false }
 }
-
-function confirmar() {
+watch(() => props.id, refresh, { immediate: true })
+async function update(status) {
+  if (saving.value || !turno.value) return
+  saving.value = true; error.value = ''
   try {
-    setEstado(turno.id, 'confirmado')
-    router.push({ name: 'admin-panel', query: { date: turno.date } })
-  } catch (e) {
-    error.value = e.message
-  }
-}
-
-function cancelar() {
-  setEstado(turno.id, 'cancelado')
-  router.push({ name: 'admin-panel', query: { date: turno.date } })
+    await setEstado(turno.value.id, status)
+    router.push({ name: 'admin-panel', query: { date: turno.value.date } })
+  } catch (e) { error.value = e.message }
+  finally { saving.value = false }
 }
 </script>
 
 <template>
-  <div class="admin-theme screen screen--client" v-if="turno">
-    <div class="card">
+  <div class="admin-theme screen screen--client">
+    <div v-if="loading" class="card" role="status">Cargando turno…</div>
+    <div v-else-if="!turno" class="card"><p role="alert">{{ error || 'No encontramos ese turno o no tenés permiso para verlo.' }}</p><router-link :to="{ name: 'admin-panel' }">Volver al panel</router-link><button type="button" @click="refresh">Reintentar</button></div>
+    <div v-else class="card">
       <router-link class="back-link" :to="{ name: 'admin-panel', query: { date: turno.date } }">← Volver al panel</router-link>
 
       <p class="detail-time">{{ formatDate(turno.date) }} · {{ turno.time }}hs</p>
@@ -45,10 +46,10 @@ function cancelar() {
       </p>
 
       <div class="detail-actions">
-        <button class="btn btn--coral" :disabled="!canConfirm" @click="confirmar">Confirmar turno</button>
-        <button class="btn btn--ghost" :disabled="turno.status === 'cancelado'" @click="cancelar">Cancelar turno</button>
+        <button class="btn btn--coral" :disabled="saving || !canConfirm" @click="update('confirmado')">Confirmar turno</button>
+        <button class="btn btn--ghost" :disabled="saving || turno.status === 'cancelado'" @click="update('cancelado')">Cancelar turno</button>
       </div>
-      <p v-if="turno.status === 'pendiente' && !canConfirm" class="form-error" role="status">La fecha ya pasó o hay otro turno confirmado en ese horario.</p>
+      <p v-if="turno.status === 'pendiente' && !canConfirm" class="form-error" role="status">La fecha o el horario ya pasaron.</p>
       <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     </div>
   </div>

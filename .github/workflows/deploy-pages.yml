@@ -22,8 +22,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Check dates and availability
-        run: node tests/availability.test.js
+      - name: Check dates, database rules and permissions
+        run: npm test
       - name: Build Vue app
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}

@@ -1,12 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    'Faltan VITE_SUPABASE_URL y/o VITE_SUPABASE_ANON_KEY. Copiá .env.example a .env y completá los valores de tu proyecto de Supabase.'
-  )
+const env = import.meta.env ?? {}
+const url = env.VITE_SUPABASE_URL
+const key = env.VITE_SUPABASE_ANON_KEY
+let client = null
+try {
+  if (url && key) client = createClient(url.trim(), key.trim())
+} catch {
+  // Render the app with an actionable configuration error instead of a blank page.
 }
-
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '')
+export const supabase = client
+export function getSupabase() {
+  if (!supabase) throw new Error('Falta configurar la URL y la clave pública de Supabase en el despliegue.')
+  return supabase
+}

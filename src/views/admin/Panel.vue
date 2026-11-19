@@ -1,23 +1,38 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { turnos } from '../../store/turnos'
-import { logout } from '../../store/auth'
+import { loadAgenda, turnos } from '../../store/turnos'
+import { authState, logout } from '../../store/auth'
 import { businessDate, formatDate, isValidDate } from '../../utils/dates'
+import { useClock } from '../../composables/useClock'
 
 const router = useRouter()
 const route = useRoute()
 const date = ref(isValidDate(route.query.date) ? route.query.date : businessDate())
-const dailyTurnos = computed(() => turnos.filter((turno) => turno.date === date.value)
-  .slice().sort((a, b) => a.time.localeCompare(b.time)))
-
+const loading = ref(false)
+const error = ref('')
+const now = useClock()
+const dailyTurnos = computed(() => turnos.filter((t) => t.date === date.value))
+const businessName = computed(() => authState.user?.user_metadata?.business_name || 'Mi barbería')
+async function refresh() {
+  if (!isValidDate(date.value)) return
+  loading.value = true; error.value = ''
+  try { await loadAgenda(date.value) } catch (e) { error.value = e.message }
+  finally { loading.value = false }
+}
+watch([date, now], (_values, _old, onCleanup) => {
+  let active = true
+  onCleanup(() => { active = false })
+  if (!isValidDate(date.value)) return
+  loading.value = true; error.value = ''
+  loadAgenda(date.value).catch((e) => { if (active) error.value = e.message })
+    .finally(() => { if (active) loading.value = false })
+}, { immediate: true })
 function statusLabel(status) {
   return { confirmado: 'Confirmado', pendiente: 'Pendiente', cancelado: 'Cancelado' }[status] || status
 }
-
 async function salir() {
-  await logout()
-  router.push({ name: 'home' })
+  try { await logout(); router.push({ name: 'home' }) } catch (e) { error.value = e.message }
 }
 </script>
 
@@ -25,7 +40,7 @@ async function salir() {
   <div class="admin-theme panel">
     <header class="panel__header">
       <div>
-        <p class="panel__eyebrow">Martín Barber Studio</p>
+        <p class="panel__eyebrow">{{ businessName }}</p>
         <h1 class="panel__title">Agenda de turnos</h1>
       </div>
       <button class="btn btn--ghost panel__logout" type="button" @click="salir">
@@ -38,7 +53,9 @@ async function salir() {
       <input id="agenda-date" v-model="date" type="date" />
     </div>
     <p class="panel__date">{{ formatDate(date) }}</p>
-    <p v-if="!dailyTurnos.length" role="status">No hay turnos para esta fecha.</p>
+    <p v-if="loading" role="status">Cargando agenda…</p>
+    <div v-if="error" class="form-error" role="alert">{{ error }} <button type="button" @click="refresh">Reintentar</button></div>
+    <p v-if="!loading && !error && !dailyTurnos.length" role="status">No hay turnos para esta fecha.</p>
     <ul class="turno-list">
       <li v-for="turno in dailyTurnos" :key="turno.id">
         <button

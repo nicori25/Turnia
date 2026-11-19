@@ -1,33 +1,37 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { booking, selectedService, submitBooking, totalPrice, VIP_SURCHARGE } from '../../store/booking'
-import { isSlotAvailable } from '../../store/turnos'
+import { booking, selectedService, submitBooking, totalPrice, validPhone, VIP_SURCHARGE } from '../../store/booking'
+import { availability, isSlotAvailable, refreshAvailability } from '../../store/turnos'
 import { formatDate } from '../../utils/dates'
 import { useClock } from '../../composables/useClock'
 
 const router = useRouter()
 const service = selectedService()
 const error = ref('')
+const saving = ref(false)
 const now = useClock()
 const available = computed(() => isSlotAvailable(booking.date, booking.time, now.value))
+watch(now, () => { if (booking.barberId && booking.date && !saving.value) void refreshAvailability(booking.barberId, booking.date) })
 
 if (!service || !available.value) {
   router.replace({ name: 'select-service' })
 }
 
 function canContinue() {
-  return available.value && booking.name.trim().length > 1 && booking.phone.trim().length > 5
+  return !saving.value && available.value && booking.name.trim().length > 1 && booking.name.trim().length <= 100 && validPhone(booking.phone.trim())
 }
 
-function confirm() {
+async function confirm() {
+  if (!canContinue()) return
+  saving.value = true
   error.value = ''
   try {
-    submitBooking()
+    await submitBooking()
     router.push({ name: 'confirmation' })
   } catch (e) {
     error.value = e.message
-  }
+  } finally { saving.value = false }
 }
 </script>
 
@@ -57,19 +61,20 @@ function confirm() {
 
       <div class="field">
         <label for="name">Nombre</label>
-        <input id="name" v-model="booking.name" type="text" placeholder="Tu nombre" />
+        <input id="name" v-model="booking.name" type="text" maxlength="100" :disabled="saving" placeholder="Tu nombre" />
       </div>
 
       <div class="field">
         <label for="phone">Teléfono</label>
-        <input id="phone" v-model="booking.phone" type="tel" placeholder="11 1234 5678" />
+        <input id="phone" v-model="booking.phone" type="tel" maxlength="30" :disabled="saving" placeholder="11 1234 5678" />
       </div>
 
       <button class="btn btn--teal" :disabled="!canContinue()" @click="confirm">
-        Solicitar turno
+        {{ saving ? 'Guardando…' : 'Solicitar turno' }}
       </button>
       <p v-if="!available" class="form-error" role="alert">El horario ya no está disponible. Volvé a elegir fecha y horario.</p>
       <p v-if="error" class="form-error" role="alert">{{ error }}</p>
+      <p v-if="availability.error" class="form-error" role="alert">{{ availability.error }}</p>
     </div>
   </div>
 </template>

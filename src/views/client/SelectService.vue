@@ -1,9 +1,9 @@
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { booking, resetBooking, services, timeSlots, VIP_SURCHARGE } from '../../store/booking'
-import { isConfirmedSlot, isSlotAvailable } from '../../store/turnos'
-import { businessDate, isBookableDate } from '../../utils/dates'
+import { booking, businesses, catalog, loadBusinesses, resetBooking, selectBusiness, services, timeSlots, VIP_SURCHARGE } from '../../store/booking'
+import { availability, clearAvailability, isConfirmedSlot, isSlotAvailable, refreshAvailability } from '../../store/turnos'
+import { businessDate, isBookableDate, isFutureSlot } from '../../utils/dates'
 import { useClock } from '../../composables/useClock'
 
 const router = useRouter()
@@ -14,6 +14,13 @@ const today = computed(() => businessDate(now.value))
 const validDate = computed(() => isBookableDate(booking.date, now.value))
 const available = (slot) => isSlotAvailable(booking.date, slot, now.value)
 const hasAvailability = computed(() => timeSlots.some(available))
+onMounted(loadBusinesses)
+
+function refresh() {
+  if (booking.barberId && validDate.value) return refreshAvailability(booking.barberId, booking.date)
+  clearAvailability()
+}
+watch(() => [booking.barberId, booking.date, now.value], refresh, { immediate: true })
 
 watch(() => booking.date, () => { booking.time = null })
 watch(() => [now.value, booking.time && available(booking.time)], () => {
@@ -21,7 +28,7 @@ watch(() => [now.value, booking.time && available(booking.time)], () => {
 }, { immediate: true })
 
 function canContinue() {
-  return services.some((service) => service.id === booking.serviceId) && available(booking.time)
+  return !catalog.loading && !availability.loading && services.some((service) => service.id === booking.serviceId) && available(booking.time)
 }
 
 function goNext() {
@@ -41,6 +48,20 @@ function goNext() {
         <span class="step-indicator__label">de 3 — servicio, fecha y horario</span>
       </div>
 
+      <p v-if="catalog.loading" role="status">Cargando servicios…</p>
+      <div v-if="catalog.error" class="form-error" role="alert">
+        {{ catalog.error }}
+        <button type="button" class="btn btn--ghost" @click="loadBusinesses">Reintentar</button>
+      </div>
+      <p v-if="catalog.loaded && !businesses.length && !catalog.loading" role="status">Todavía no hay barberías registradas.</p>
+      <div v-if="businesses.length" class="field">
+        <label for="business">Barbería</label>
+        <select id="business" :value="booking.barberId || ''" @change="selectBusiness($event.target.value)">
+          <option value="">Elegí una barbería</option>
+          <option v-for="business in businesses" :key="business.id" :value="business.id">{{ business.business_name }}</option>
+        </select>
+      </div>
+      <p v-if="booking.barberId && !catalog.loading && !catalog.error && !services.length" role="status">Esta barbería todavía no tiene servicios disponibles.</p>
       <h2 class="section-title">¿Qué te hacés?</h2>
       <div class="option-list">
         <button
@@ -70,7 +91,10 @@ function goNext() {
 
       <h2 class="section-title">Elegí el horario</h2>
       <p v-if="!booking.date" class="date-help">Seleccioná una fecha para ver los horarios disponibles.</p>
-      <p v-else-if="validDate && !hasAvailability" class="date-help" role="status">No quedan horarios disponibles para esta fecha. Elegí otro día.</p>
+      <p v-else-if="!booking.barberId" class="date-help">Elegí una barbería para consultar disponibilidad.</p>
+      <p v-else-if="availability.loading" class="date-help" role="status">Consultando disponibilidad…</p>
+      <div v-else-if="availability.error" class="form-error" role="alert">{{ availability.error }} <button type="button" @click="refresh">Reintentar</button></div>
+      <p v-else-if="validDate && availability.ready && !hasAvailability" class="date-help" role="status">No quedan horarios disponibles para esta fecha. Elegí otro día.</p>
       <div class="time-grid">
         <button
           v-for="slot in timeSlots"
@@ -83,7 +107,7 @@ function goNext() {
         >
           {{ slot }}
           <small v-if="validDate && isConfirmedSlot(booking.date, slot)">Ocupado</small>
-          <small v-else-if="validDate && !available(slot)">Ya pasó</small>
+          <small v-else-if="validDate && !isFutureSlot(booking.date, slot, now)">Ya pasó</small>
         </button>
       </div>
 
