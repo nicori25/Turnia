@@ -1,12 +1,18 @@
 <script setup>
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { turnos } from '../../store/turnos'
 import { logout } from '../../store/auth'
+import { businessDate, formatDate, isValidDate } from '../../utils/dates'
 
 const router = useRouter()
+const route = useRoute()
+const date = ref(isValidDate(route.query.date) ? route.query.date : businessDate())
+const dailyTurnos = computed(() => turnos.filter((turno) => turno.date === date.value)
+  .slice().sort((a, b) => a.time.localeCompare(b.time)))
 
 function statusLabel(status) {
-  return status === 'confirmado' ? 'Confirmado' : 'Pendiente'
+  return { confirmado: 'Confirmado', pendiente: 'Pendiente', cancelado: 'Cancelado' }[status] || status
 }
 
 async function salir() {
@@ -20,15 +26,21 @@ async function salir() {
     <header class="panel__header">
       <div>
         <p class="panel__eyebrow">Martín Barber Studio</p>
-        <h1 class="panel__title">Turnos de hoy</h1>
+        <h1 class="panel__title">Agenda de turnos</h1>
       </div>
       <button class="btn btn--ghost panel__logout" type="button" @click="salir">
         Salir
       </button>
     </header>
 
+    <div class="field">
+      <label for="agenda-date">Fecha de la agenda</label>
+      <input id="agenda-date" v-model="date" type="date" />
+    </div>
+    <p class="panel__date">{{ formatDate(date) }}</p>
+    <p v-if="!dailyTurnos.length" role="status">No hay turnos para esta fecha.</p>
     <ul class="turno-list">
-      <li v-for="turno in turnos" :key="turno.id">
+      <li v-for="turno in dailyTurnos" :key="turno.id">
         <button
           class="turno-row"
           type="button"
@@ -72,6 +84,10 @@ async function salir() {
 
 .panel__title {
   font-size: 28px;
+}
+
+.panel__date {
+  margin-bottom: 16px;
 }
 
 .panel__logout {
@@ -134,5 +150,9 @@ async function salir() {
 
 .turno-row__status[data-status='confirmado'] {
   color: var(--color-teal);
+}
+
+.turno-row__status[data-status='cancelado'] {
+  color: var(--color-coral);
 }
 </style>

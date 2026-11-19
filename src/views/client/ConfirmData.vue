@@ -1,26 +1,40 @@
 <script setup>
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { booking, selectedService, totalPrice, VIP_SURCHARGE } from '../../store/booking'
+import { booking, selectedService, submitBooking, totalPrice, VIP_SURCHARGE } from '../../store/booking'
+import { isSlotAvailable } from '../../store/turnos'
+import { formatDate } from '../../utils/dates'
+import { useClock } from '../../composables/useClock'
 
 const router = useRouter()
 const service = selectedService()
+const error = ref('')
+const now = useClock()
+const available = computed(() => isSlotAvailable(booking.date, booking.time, now.value))
 
-if (!service || !booking.time) {
+if (!service || !available.value) {
   router.replace({ name: 'select-service' })
 }
 
 function canContinue() {
-  return booking.name.trim().length > 1 && booking.phone.trim().length > 5
+  return available.value && booking.name.trim().length > 1 && booking.phone.trim().length > 5
 }
 
 function confirm() {
-  if (canContinue()) router.push({ name: 'confirmation' })
+  error.value = ''
+  try {
+    submitBooking()
+    router.push({ name: 'confirmation' })
+  } catch (e) {
+    error.value = e.message
+  }
 }
 </script>
 
 <template>
   <div class="screen screen--client" v-if="service">
     <div class="card">
+      <router-link class="back-link" :to="{ name: 'select-service' }">← Cambiar fecha u horario</router-link>
       <div class="step-indicator">
         <span class="step-indicator__num">2</span>
         <span class="step-indicator__label">de 3 — tus datos</span>
@@ -28,7 +42,7 @@ function confirm() {
 
       <div class="summary">
         <div class="summary__row">
-          <span>{{ service.name }} · {{ booking.time }}hs</span>
+          <span>{{ service.name }} · {{ formatDate(booking.date) }} · {{ booking.time }}hs</span>
           <span>${{ service.price.toLocaleString('es-AR') }}</span>
         </div>
         <div class="summary__row" v-if="booking.vip">
@@ -52,13 +66,22 @@ function confirm() {
       </div>
 
       <button class="btn btn--teal" :disabled="!canContinue()" @click="confirm">
-        Confirmar turno
+        Solicitar turno
       </button>
+      <p v-if="!available" class="form-error" role="alert">El horario ya no está disponible. Volvé a elegir fecha y horario.</p>
+      <p v-if="error" class="form-error" role="alert">{{ error }}</p>
     </div>
   </div>
 </template>
 
 <style scoped>
+.back-link {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--color-teal);
+  font-size: 14px;
+}
+
 .summary {
   background: var(--color-bg);
   border: 1px solid var(--color-border);

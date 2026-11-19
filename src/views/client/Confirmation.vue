@@ -1,11 +1,13 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { booking, selectedService, totalPrice, resetBooking } from '../../store/booking'
+import { getTurno } from '../../store/turnos'
+import { formatDate } from '../../utils/dates'
 
 const router = useRouter()
 const service = selectedService()
 
-if (!service) {
+if (!service || !getTurno(booking.turnoId)) {
   router.replace({ name: 'home' })
 }
 
@@ -23,16 +25,16 @@ function backToHome() {
         <span class="step-indicator__label">de 3 — listo</span>
       </div>
 
-      <h2 class="confirm-title">Turno reservado</h2>
+      <h2 class="confirm-title">Solicitud recibida</h2>
       <p class="confirm-detail">
-        {{ service.name }} el día de hoy a las {{ booking.time }}hs.
+        {{ service.name }} el {{ formatDate(booking.date) }} a las {{ booking.time }}hs.
         <span v-if="booking.vip">Tenés prioridad VIP.</span>
       </p>
       <p class="confirm-total">Total: ${{ totalPrice().toLocaleString('es-AR') }}</p>
 
       <p class="confirm-note">
-        Te mandamos la confirmación por WhatsApp o email a
-        {{ booking.name }}. Guardá este turno, no hace falta que vuelvas a escribirnos.
+        {{ booking.name }}, tu solicitud está pendiente de aceptación por el barbero.
+        El horario quedará bloqueado cuando la confirme. Esta demo conserva los turnos solo durante la sesión actual.
       </p>
 
       <button class="btn btn--ghost" @click="backToHome">Volver al inicio</button>

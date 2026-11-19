@@ -1,11 +1,27 @@
 <script setup>
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { booking, services, timeSlots, VIP_SURCHARGE } from '../../store/booking'
+import { booking, resetBooking, services, timeSlots, VIP_SURCHARGE } from '../../store/booking'
+import { isConfirmedSlot, isSlotAvailable } from '../../store/turnos'
+import { businessDate, isBookableDate } from '../../utils/dates'
+import { useClock } from '../../composables/useClock'
 
 const router = useRouter()
+// Returning after submission starts a new draft, not an edit of the sent request.
+if (booking.turnoId) resetBooking()
+const now = useClock()
+const today = computed(() => businessDate(now.value))
+const validDate = computed(() => isBookableDate(booking.date, now.value))
+const available = (slot) => isSlotAvailable(booking.date, slot, now.value)
+const hasAvailability = computed(() => timeSlots.some(available))
+
+watch(() => booking.date, () => { booking.time = null })
+watch(() => [now.value, booking.time && available(booking.time)], () => {
+  if (booking.time && !available(booking.time)) booking.time = null
+}, { immediate: true })
 
 function canContinue() {
-  return booking.serviceId && booking.time
+  return services.some((service) => service.id === booking.serviceId) && available(booking.time)
 }
 
 function goNext() {
@@ -22,7 +38,7 @@ function goNext() {
 
       <div class="step-indicator">
         <span class="step-indicator__num">1</span>
-        <span class="step-indicator__label">de 3 — servicio y horario</span>
+        <span class="step-indicator__label">de 3 — servicio, fecha y horario</span>
       </div>
 
       <h2 class="section-title">¿Qué te hacés?</h2>
@@ -44,17 +60,30 @@ function goNext() {
         </button>
       </div>
 
+      <div class="field">
+        <label for="booking-date">Elegí la fecha</label>
+        <input id="booking-date" v-model="booking.date" type="date" :min="today" required
+          :aria-invalid="Boolean(booking.date && !validDate)" aria-describedby="date-help" />
+        <p id="date-help" class="date-help">Horarios de Buenos Aires. Solo se permiten fechas desde hoy.</p>
+      </div>
+      <p v-if="booking.date && !validDate" class="form-error" role="alert">Elegí una fecha válida que no haya pasado.</p>
+
       <h2 class="section-title">Elegí el horario</h2>
+      <p v-if="!booking.date" class="date-help">Seleccioná una fecha para ver los horarios disponibles.</p>
+      <p v-else-if="validDate && !hasAvailability" class="date-help" role="status">No quedan horarios disponibles para esta fecha. Elegí otro día.</p>
       <div class="time-grid">
         <button
           v-for="slot in timeSlots"
           :key="slot"
           class="time-slot"
           type="button"
-          :aria-pressed="booking.time === slot"
+          :aria-pressed="booking.time === slot && available(slot)"
+          :disabled="!available(slot)"
           @click="booking.time = slot"
         >
           {{ slot }}
+          <small v-if="validDate && isConfirmedSlot(booking.date, slot)">Ocupado</small>
+          <small v-else-if="validDate && !available(slot)">Ya pasó</small>
         </button>
       </div>
 
@@ -106,12 +135,29 @@ function goNext() {
 }
 
 .time-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   padding: 12px 0;
   border-radius: 8px;
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   color: var(--color-text);
   font-size: 14px;
+}
+
+.time-slot:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.time-slot small, .date-help {
+  font-size: 12px;
+}
+
+.date-help {
+  margin-bottom: 12px;
 }
 
 .time-slot[aria-pressed='true'] {
