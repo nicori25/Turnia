@@ -16,6 +16,10 @@ function goNext() {
 <template>
   <div class="screen screen--client">
     <div class="card">
+      <router-link class="back-link" :to="{ name: 'home' }">
+        <span aria-hidden="true">←</span> Volver al inicio
+      </router-link>
+
       <div class="step-indicator">
         <span class="step-indicator__num">1</span>
         <span class="step-indicator__label">de 3 — servicio y horario</span>
@@ -70,6 +74,21 @@ function goNext() {
 </template>
 
 <style scoped>
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 12px;
+  color: var(--color-teal);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
 .section-title {
   font-size: 18px;
   margin: 20px 0 12px;
