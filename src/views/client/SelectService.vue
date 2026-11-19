@@ -17,10 +17,10 @@ const hasAvailability = computed(() => timeSlots.some(available))
 onMounted(loadBusinesses)
 
 function refresh() {
-  if (booking.barberId && validDate.value) return refreshAvailability(booking.barberId, booking.date)
+  if (booking.barberId && validDate.value) return refreshAvailability(booking.barberId, booking.date, booking.serviceId)
   clearAvailability()
 }
-watch(() => [booking.barberId, booking.date, now.value], refresh, { immediate: true })
+watch(() => [booking.barberId, booking.date, booking.serviceId, now.value], refresh, { immediate: true })
 
 watch(() => booking.date, () => { booking.time = null })
 watch(() => [now.value, booking.time && available(booking.time)], () => {
@@ -53,11 +53,11 @@ function goNext() {
         {{ catalog.error }}
         <button type="button" class="btn btn--ghost" @click="loadBusinesses">Reintentar</button>
       </div>
-      <p v-if="catalog.loaded && !businesses.length && !catalog.loading" role="status">Todavía no hay barberías registradas.</p>
+      <p v-if="catalog.loaded && !businesses.length && !catalog.loading" role="status">Todavía no hay profesionales activos.</p>
       <div v-if="businesses.length" class="field">
-        <label for="business">Barbería</label>
+        <label for="business">Barbería y profesional</label>
         <select id="business" :value="booking.barberId || ''" @change="selectBusiness($event.target.value)">
-          <option value="">Elegí una barbería</option>
+          <option value="">Elegí dónde y con quién reservar</option>
           <option v-for="business in businesses" :key="business.id" :value="business.id">{{ business.business_name }}</option>
         </select>
       </div>

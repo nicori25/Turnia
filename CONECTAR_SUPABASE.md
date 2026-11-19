@@ -1,82 +1,79 @@
-# Activar la integración de Supabase
+# Activar Supabase con el esquema real
 
-La rama `supabase-integration` reemplaza el catálogo y los turnos en memoria por
-consultas y operaciones reales en Supabase. La aplicación de `main` se mantiene
-como está hasta completar la actualización de la base y la comprobación remota.
+Rama: `supabase-integration`. Pendiente de aplicar la migración en el proyecto
+remoto y validar el recorrido real antes de activar el código en `main`.
 
-## 1. Aplicar la migración
+## Aplicar la actualización
 
-En el proyecto correcto de Supabase:
+1. Abrir **SQL Editor → New query** en el proyecto Supabase correcto.
+2. Revisar el respaldo del proyecto y copiar el archivo completo
+   `supabase/migrations/20261119_organizaciones_profesionales.sql`.
+3. Pulsar **Run** y comprobar que la transacción termine sin errores.
 
-1. Revisar un respaldo del proyecto antes de modificar el esquema o los permisos.
-2. Abrir **SQL Editor → New query**.
-3. Copiar el contenido completo de
-   `supabase/migrations/20261119_reservas_persistentes.sql` y pulsar **Run**.
-4. Comprobar que la transacción finalice sin errores.
+La migración anterior `20261119_reservas_persistentes.sql` fue reemplazada.
+No ejecutarla, no borrar políticas y no ejecutar el esquema antiguo que crea
+`barberos`. La actualización nueva solo agrega funciones RPC `turnia_v2_*` y
+sus permisos de ejecución. No cambia tablas, registros, políticas existentes,
+funciones de permisos, triggers de registro ni el bloqueo `turnia_sin_solapamiento`.
 
-No hace falta ejecutar `supabase/schema.sql` primero. La migración admite una
-instalación vacía y el esquema anterior. No borra registros; si encuentra dos
-turnos ya confirmados en el mismo horario o políticas personalizadas, aborta y
-requiere revisar el conflicto. No eliminar reservas o políticas para forzarla.
+## Modelo utilizado
 
-Crea perfiles para las cuentas existentes y un catálogo inicial de Corte,
-Barba y Corte + barba cuando el barbero no tiene servicios. No reemplaza sus
-precios ni agrega clientes o turnos ficticios. Los registros nuevos reciben
-perfil y catálogo mediante el trigger de registro.
+- La lista pública muestra organización y profesional activo. Los servicios
+  pueden pertenecer a un profesional o ser compartidos por su organización.
+- La solicitud comprueba que servicio y profesional pertenezcan a la misma
+  organización. Guarda nombre del servicio, duración, precio del servidor y
+  recargo VIP de $1.500. Vincula un cliente por organización y teléfono exacto;
+  no modifica datos de un cliente existente desde el formulario público.
+- El registro de cuentas y la asignación de perfiles/organizaciones continúan
+  usando el mecanismo existente del proyecto. No se crean organizaciones ni
+  se conceden roles automáticamente desde el frontend. Una cuenta sin perfil
+  necesita que el responsable del proyecto la configure.
+- La agenda RPC autentica mediante `auth.uid()`: `admin` accede a los turnos de
+  su organización y `profesional` solo a los propios. El rol se lee de `perfiles`,
+  nunca de datos elegidos por el usuario en el navegador.
+- La consulta pública de disponibilidad devuelve solo horas bloqueadas. No
+  devuelve nombres, teléfonos ni datos de reservas.
 
-## 2. Configuración
+## Regla de ocupación existente
 
-Mantener las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` del mismo
-proyecto en Actions. Usar la clave pública anon; nunca service_role. Revisar en
-Supabase Auth la URL del sitio y los retornos autorizados para GitHub Pages.
+`turnia_sin_solapamiento` es una exclusión por `profesional_id` y el intervalo
+`periodo`. Bloquea **pendientes y confirmados**. La app conserva esa regla:
+una solicitud pendiente ya retiene la capacidad; cancelar la libera.
 
-Para que el agente pueda verificar la conexión desde este chat, permitir el
-dominio del proyecto Supabase en la red del entorno y guardar el cambio. En la
-última comprobación el proxy seguía devolviendo 403. Eso es distinto de un fallo
-de credenciales. No enviar contraseñas ni claves privadas por el chat.
+El intervalo se calcula con la fecha, hora y duración real del servicio. Un turno
+largo puede bloquear también la siguiente hora de inicio. La restricción evita
+solapamientos incluso ante operaciones concurrentes o escrituras fuera de la RPC.
+Los otros profesionales y organizaciones conservan su disponibilidad independiente.
 
-## 3. Verificación remota y activación
+## Configuración y prueba remota
 
-Con una cuenta de pruebas autorizada:
+Mantener las variables `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` del proyecto
+correcto en Actions; nunca usar service_role. Configurar los retornos de Auth para
+el sitio de GitHub Pages. Para verificar desde el chat, permitir el dominio del
+proyecto en la red del entorno; la última consulta seguía bloqueada por el proxy.
 
-1. Abrir la reserva y comprobar que aparecen la barbería y sus servicios reales.
-2. En otro navegador o celular, enviar una solicitud para una fecha futura.
-3. Iniciar sesión como propietario, abrir esa fecha y confirmar la solicitud.
-4. Actualizar la disponibilidad del cliente: el horario debe aparecer ocupado.
-5. Recargar la agenda: el turno debe conservarse. Cancelarlo debe liberar la hora.
-6. Probar que otra cuenta no pueda leer ni modificar los turnos de ese propietario.
-7. Cuando estas comprobaciones pasen, integrar esta rama en `main` y verificar
-   el despliegue de Pages. La subida de la rama no publica la nueva versión.
+Después del SQL, con cuentas de pruebas existentes:
 
-La disponibilidad y la agenda se consultan cada 15 segundos mientras su pantalla
-está abierta; también se verifican al enviar. La base impide dos confirmaciones
-para un mismo barbero, fecha y hora aun cuando los clientes tengan datos antiguos.
+1. Abrir la rama en un entorno de pruebas y elegir organización/profesional.
+2. Solicitar un servicio para una fecha futura desde otro navegador o celular.
+3. Comprobar que el horario pendiente ya está retenido y no se puede duplicar.
+4. Iniciar sesión como profesional, abrir la fecha y confirmar o cancelar.
+5. Recargar la agenda y comprobar persistencia. Cancelar libera el horario.
+6. Comprobar que el administrador ve su organización y otro profesional no puede
+   leer ni cambiar los turnos ajenos.
+7. Tras validar, integrar en `main` y comprobar el despliegue.
 
-## Seguridad y alcance
+No se incluyen pagos ni envío de notificaciones. Las consultas se actualizan cada
+15 segundos y las operaciones siempre se validan en el servidor.
 
-- La consulta pública solo devuelve locales, servicios y horas confirmadas.
-  No revela nombres ni teléfonos de clientes.
-- Los turnos se leen con la sesión del propietario y RLS. No hay claves de
-  administrador en el frontend ni acceso directo de escritura a las tablas.
-- Las solicitudes se crean mediante RPC con validación de fecha, hora, nombre,
-  teléfono y precio calculado en el servidor. El recargo VIP permanece en $1.500.
-- Una clave aleatoria por solicitud permite reintentar sin duplicar el mismo envío.
-- Las confirmaciones usan un bloqueo transaccional por barbero y un índice único;
-  los cancelados liberan el horario y los pendientes requieren aceptación.
-- Se conservan los seis horarios actuales y servicios de hasta 60 minutos.
-  No se implementan calendarios distintos por barbero, pagos o notificaciones.
-- No hay respaldo silencioso con datos ficticios cuando falla Supabase: se muestra
-  un mensaje y se impide enviar una reserva con disponibilidad desconocida.
+## Evidencia local
 
-## Pruebas realizadas
+`npm test`: 5 pruebas de fechas/disponibilidad/normalización y 8 de PostgreSQL
+embebido PGlite con `btree_gist`. La base de prueba reconstruye las tablas,
+políticas y restricciones compartidas por el usuario. Se verifican permisos,
+persistencia, clientes, idempotencia, exclusión por duración y preservación de
+las políticas. No es una copia del proyecto remoto ni acredita sus triggers.
 
-`npm test` ejecuta 5 pruebas de fechas, disponibilidad y normalización, y 9 pruebas
-con PostgreSQL embebido PGlite: instalación y actualización repetibles, persistencia,
-permisos, aislamiento, validación, idempotencia, aceptación/cancelación y unicidad.
-También pasó la compilación de Pages.
-
-En Chromium se verificaron dos contextos de navegador con respuestas de API
-simuladas: catálogo, solicitud, login, agenda después de recargar, confirmación,
-bloqueo en el otro navegador, cancelación y error de base sin disponibilidad falsa.
-Estas pruebas no sustituyen la validación contra el proyecto Supabase real;
-la migración remota y dicha validación siguen pendientes.
+También pasó la compilación de Pages. El recorrido de interfaz se prueba con
+respuestas simuladas en dos navegadores; la validación contra Supabase real
+sigue pendiente. No se afirma que la conexión productiva ya esté activa.

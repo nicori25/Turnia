@@ -12,7 +12,7 @@ const error = ref('')
 const saving = ref(false)
 const now = useClock()
 const available = computed(() => isSlotAvailable(booking.date, booking.time, now.value))
-watch(now, () => { if (booking.barberId && booking.date && !saving.value) void refreshAvailability(booking.barberId, booking.date) })
+watch(now, () => { if (booking.barberId && booking.date && !saving.value) void refreshAvailability(booking.barberId, booking.date, booking.serviceId) })
 
 if (!service || !available.value) {
   router.replace({ name: 'select-service' })

@@ -37,7 +37,7 @@ export async function selectBusiness(id) {
     const rows = await listServices(id)
     if (request !== catalogRequest) return
     services.splice(0, services.length, ...rows.map((s) => ({ id: s.id, name: s.nombre, duration: `${s.duracion_min} min`, price: Number(s.precio) })))
-    if (booking.date) await refreshAvailability(id, booking.date)
+    if (booking.date) await refreshAvailability(id, booking.date, booking.serviceId)
   } catch (e) { if (request === catalogRequest) catalog.error = e.message }
   finally { if (request === catalogRequest) catalog.loading = false }
 }
@@ -57,12 +57,12 @@ export async function submitBooking(now = new Date()) {
   requestFingerprint = fingerprint
   submitting = true
   try {
-    const result = await requestBooking({ p_servicio_id: service.id, p_fecha: booking.date, p_hora: booking.time,
+    const result = await requestBooking({ p_profesional_id: booking.barberId, p_servicio_id: service.id, p_fecha: booking.date, p_hora: booking.time,
       p_nombre: booking.name.trim(), p_telefono: booking.phone.trim(), p_vip: booking.vip, p_solicitud_id: booking.requestId })
     booking.turnoId = result.id; booking.receipt = result
     return result
   } catch (e) {
-    await refreshAvailability(booking.barberId, booking.date)
+    await refreshAvailability(booking.barberId, booking.date, booking.serviceId)
     throw e
   } finally { submitting = false }
 }

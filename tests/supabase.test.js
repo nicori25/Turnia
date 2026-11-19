@@ -1,110 +1,103 @@
-import test, { before, beforeEach, after } from 'node:test'
+import test,{before,beforeEach,after} from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
-import { PGlite } from '@electric-sql/pglite'
-
-const migration = await readFile(new URL('../supabase/migrations/20261119_reservas_persistentes.sql', import.meta.url), 'utf8')
-const legacy = await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8')
-const a = '11111111-1111-4111-8111-111111111111', b = '22222222-2222-4222-8222-222222222222'
-const bootstrap = `create role anon; create role authenticated; create schema auth;
-create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
-create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
-grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`
-let db, serviceA, serviceB
-async function asRole(role, uid, sql, params = []) {
-  await db.query("select set_config('request.jwt.claim.sub',$1,false)", [uid ?? ''])
-  await db.exec(`set role ${role}`)
-  try { return await db.query(sql, params) } finally { await db.exec('reset role') }
+import {readFile} from 'node:fs/promises'
+import {PGlite} from '@electric-sql/pglite'
+import {btree_gist} from '@electric-sql/pglite/contrib/btree_gist'
+const migration=await readFile(new URL('../supabase/migrations/20261119_organizaciones_profesionales.sql',import.meta.url),'utf8')
+const fixture=await readFile(new URL('./fixtures/organizaciones.sql',import.meta.url),'utf8')
+const uuid=(n)=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
+const orgA=uuid(1),orgB=uuid(2),adminA=uuid(3),userA=uuid(4),adminB=uuid(5),userB=uuid(6)
+const proA=uuid(7),proB=uuid(8),proC=uuid(9),serviceA=uuid(10),serviceB=uuid(11),longService=uuid(12),privateService=uuid(13)
+let db,policies,tokenId=100
+async function role(name,user,sql,params=[]){
+ await db.query("select set_config('request.jwt.claim.sub',$1,false)",[user??''])
+ await db.exec(`set role ${name}`)
+ try{return await db.query(sql,params)}finally{await db.exec('reset role')}
 }
-let tokenCounter = 1
-const token = () => `aaaaaaaa-aaaa-4aaa-8aaa-${String(tokenCounter++).padStart(12, '0')}`
-const request = (service = serviceA, overrides = {}) => asRole('anon', null,
- 'select public.turnia_solicitar($1,$2::date,$3::time,$4,$5,$6,$7::uuid) as receipt',
- [service, overrides.date ?? '2099-05-01', overrides.time ?? '10:00', overrides.name ?? 'Cliente Prueba', overrides.phone ?? '1112345678', overrides.vip ?? false, overrides.token ?? token()])
-const change = (owner, id, state) => asRole('authenticated',owner,'select public.turnia_estado($1::uuid,$2) as receipt',[id,state])
-before(async () => {
- db = new PGlite()
- await db.exec(bootstrap)
- await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2),($3,$4)', [a,{business_name:'Local A'},b,{business_name:'Local B'}])
- await db.exec(legacy)
- await db.exec(migration)
- await db.exec(migration)
- const rows = (await db.query('select id,barbero_id from public.servicios order by precio')).rows
- serviceA = rows.find((s) => s.barbero_id === a).id
- serviceB = rows.find((s) => s.barbero_id === b).id
+const token=()=>uuid(tokenId++)
+async function request(options={}){
+ const r=await role('anon',null,'select turnia_v2_solicitar($1,$2,$3::date,$4::time,$5,$6,$7,$8) as receipt',
+ [options.pro??proA,options.service??serviceA,options.date??'2099-05-01',options.time??'10:00',options.name??'Cliente de prueba',options.phone??'1112345678',options.vip??false,options.token??token()])
+ return r.rows[0].receipt
+}
+const change=(user,id,status)=>role('authenticated',user,'select turnia_v2_estado($1,$2)',[id,status])
+const agenda=async(user,date='2099-05-01')=>(await role('authenticated',user,'select * from turnia_v2_agenda($1::date,null)',[date])).rows
+before(async()=>{
+ db=new PGlite({extensions:{btree_gist}})
+ await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`)
+ await db.exec(fixture)
+ for(const user of [adminA,userA,adminB,userB])await db.query('insert into auth.users values($1)',[user])
+ await db.query("insert into organizaciones(id,nombre,slug) values($1,'Local A','a'),($2,'Local B','b')",[orgA,orgB])
+ for(const [user,org,name,rol] of [[adminA,orgA,'Admin A','admin'],[userA,orgA,'Profesional A','profesional'],[adminB,orgB,'Admin B','admin'],[userB,orgA,'Profesional B','profesional']])
+  await db.query('insert into perfiles(id,organizacion_id,nombre,rol)values($1,$2,$3,$4)',[user,org,name,rol])
+ await db.query("insert into profesionales(id,organizacion_id,perfil_id,nombre)values($1,$2,$3,'Pro A'),($4,$2,$5,'Pro B'),($6,$7,null,'Pro C')",[proA,orgA,userA,proB,userB,proC,orgB])
+ for(const [id,org,pro,name,duration,price] of [[serviceA,orgA,null,'Corte',30,4500],[serviceB,orgB,null,'Corte B',30,5000],[longService,orgA,null,'Servicio largo',90,7000],[privateService,orgA,proA,'Solo A',30,3000]])
+  await db.query('insert into servicios(id,organizacion_id,profesional_id,nombre,duracion_min,precio)values($1,$2,$3,$4,$5,$6)',[id,org,pro,name,duration,price])
+ policies=(await db.query('select * from pg_policies order by policyname')).rows
+ await db.exec(migration);await db.exec(migration)
 })
-beforeEach(async () => { await db.exec('delete from public.turnos') })
-after(async () => { await db.close() })
+beforeEach(async()=>{await db.exec('delete from turnos;delete from clientes')})
+after(async()=>db.close())
 
-test('legacy upgrade is repeatable, backfills profiles and seeds services once', async () => {
- assert.equal((await db.query('select count(*)::int as n from public.barberos')).rows[0].n,2)
- assert.equal((await db.query('select count(*)::int as n from public.servicios')).rows[0].n,6)
- const rows = (await asRole('anon',null,'select * from public.turnia_locales()')).rows
- assert.deepEqual(Object.keys(rows[0]).sort(),['business_name','id'])
+test('migration is repeatable and leaves existing policies and records intact',async()=>{
+ assert.deepEqual((await db.query('select * from pg_policies order by policyname')).rows,policies)
+ assert.equal((await db.query("select count(*)::int n from servicios")).rows[0].n,4)
+ assert.equal((await db.query("select count(*)::int n from pg_tables where schemaname='public' and tablename='barberos'")).rows[0].n,0)
 })
-test('public request persists with server-computed price and idempotent receipt', async () => {
- const key = token()
- const first = (await request(serviceA,{vip:true,token:key})).rows[0].receipt
- const again = (await request(serviceA,{vip:true,token:key})).rows[0].receipt
- assert.equal(first.id,again.id)
- assert.equal(first.estado,'pendiente')
- assert.equal(first.precio_total,4500) // cheapest service is Barba (3000) + VIP (1500)
- assert.equal((await db.query('select count(*)::int as n from public.turnos')).rows[0].n,1)
- await assert.rejects(request(serviceA,{phone:'1199999999',token:key}),/ya utilizado/)
+test('public directory and catalog select active professionals and compatible services',async()=>{
+ const rows=(await role('anon',null,'select * from turnia_v2_locales()')).rows
+ assert.equal(rows.length,3);assert.deepEqual(Object.keys(rows[0]).sort(),['business_name','id'])
+ const services=(await role('anon',null,'select * from turnia_v2_servicios($1)',[proB])).rows
+ assert(!services.some(s=>s.id===privateService));assert(services.some(s=>s.id===serviceA))
+ await assert.rejects(request({pro:proB,service:privateService}),/Servicio no disponible/)
+ await assert.rejects(request({pro:proA,service:serviceB}),/Servicio no disponible/)
 })
-test('anonymous users cannot read clients or write arbitrary table records', async () => {
- await request()
- await assert.rejects(asRole('anon',null,'select * from public.turnos'),/permission denied/)
- await assert.rejects(asRole('anon',null,"update public.turnos set estado='confirmado'"),/permission denied/)
- await assert.rejects(asRole('anon',null,'select public.turnia_estado($1,$2)',[token(),'confirmado']),/permission denied/)
+test('request snapshots price and duration, links a client, retries without duplication',async()=>{
+ const key=token();const a=await request({vip:true,token:key}),b=await request({vip:true,token:key})
+ assert.equal(a.id,b.id);assert.equal(a.precio_total,6000)
+ const t=(await db.query('select * from turnos')).rows[0]
+ assert.equal(t.servicio_nombre,'Corte');assert.equal(t.duracion_min,30);assert(t.cliente_id)
+ assert.equal((await db.query('select count(*)::int n from clientes')).rows[0].n,1)
+ await assert.rejects(request({token:key,name:'Otra persona'}),/ya utilizado/)
 })
-test('owner-only RLS and status RPC prevent cross-business access', async () => {
- const ta=(await request()).rows[0].receipt
- await request(serviceB)
- const own=(await asRole('authenticated',a,'select id from public.turnos')).rows
- assert.deepEqual(own.map((t)=>t.id),[ta.id])
- await assert.rejects(change(b,ta.id,'confirmado'),/sin permiso/)
- await assert.rejects(asRole('authenticated',a,"update public.turnos set estado='confirmado'"),/permission denied/)
-})
-test('only one pending request can be accepted; cancellation frees the public slot', async () => {
- const first=(await request()).rows[0].receipt, second=(await request()).rows[0].receipt
- await change(a,first.id,'confirmado')
- await assert.rejects(change(a,second.id,'confirmado'),/ocupado/)
+test('pending and confirmed appointments block overlapping durations, not another professional',async()=>{
+ const t=await request({service:longService})
+ await assert.rejects(request({time:'11:00'}),/ocupado/)
+ const occupied=(await role('anon',null,'select * from turnia_v2_ocupados($1,$2::date,$3)',[proA,'2099-05-01',serviceA])).rows
+ assert.deepEqual(occupied.map(r=>r.hora),['10:00:00','11:00:00']);assert.deepEqual(Object.keys(occupied[0]),['hora'])
+ await request({pro:proB,time:'11:00'})
+ await change(userA,t.id,'confirmado')
  await assert.rejects(request(),/ocupado/)
- const occupied=(await asRole('anon',null,'select * from public.turnia_ocupados($1,$2::date)',[a,'2099-05-01'])).rows
- assert.equal(occupied.length,1)
- assert.deepEqual(Object.keys(occupied[0]),['hora'])
- assert.equal((await asRole('anon',null,'select * from public.turnia_ocupados($1,$2::date)',[b,'2099-05-01'])).rows.length,0)
- await change(a,first.id,'cancelado')
- await change(a,second.id,'confirmado')
+ await change(adminA,t.id,'cancelado');await request()
 })
-test('server rejects past dates, nonexistent slots, malformed data and invalid state', async () => {
- await assert.rejects(request(serviceA,{date:'2000-01-01'}),/pasado/)
- await assert.rejects(request(serviceA,{time:'10:15'}),/Horario inválido/)
- await assert.rejects(request(serviceA,{phone:'abcdef'}),/Teléfono inválido/)
- await assert.rejects(request(serviceA,{name:' '}),/Nombre inválido/)
- const t=(await request()).rows[0].receipt
- await assert.rejects(change(a,t.id,'otro'),/Estado inválido/)
+test('admin sees the organization and professionals only their own appointments',async()=>{
+ const t=await request();await request({pro:proB});await request({pro:proC,service:serviceB})
+ assert.equal((await agenda(adminA)).length,2)
+ assert.deepEqual((await agenda(userA)).map(t=>t.id),[t.id])
+ assert.equal((await agenda(adminB)).length,1)
+ await assert.rejects(change(userB,t.id,'confirmado'),/sin permiso/)
+ await assert.rejects(change(adminB,t.id,'cancelado'),/sin permiso/)
+ await change(userA,t.id,'confirmado');await change(adminA,t.id,'cancelado')
 })
-test('database unique index protects against duplicate confirmed slots outside the RPC', async () => {
- const t=(await request()).rows[0].receipt
- await change(a,t.id,'confirmado')
- const other=(await request(serviceA,{time:'11:00'})).rows[0].receipt
- await assert.rejects(db.query("update public.turnos set hora='10:00',estado='confirmado' where id=$1",[other.id]),/unique constraint/)
+test('anonymous users cannot inspect clients or change appointment states',async()=>{
+ const t=await request()
+ assert.equal((await role('anon',null,'select * from turnos')).rows.length,0)
+ await assert.rejects(role('anon',null,'select * from turnia_v2_agenda($1::date,null)',['2099-05-01']),/permission denied/)
+ await assert.rejects(role('anon',null,'select turnia_v2_estado($1,$2)',[t.id,'confirmado']),/permission denied/)
 })
-test('registration trigger creates a profile and three services, without trusting a role claim', async () => {
- const id='33333333-3333-4333-8333-333333333333'
- await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2)',[id,{business_name:'Local C',role:'admin'}])
- assert.equal((await db.query('select count(*)::int as n from public.servicios where barbero_id=$1',[id])).rows[0].n,3)
- assert.equal((await asRole('authenticated',id,'select * from public.turnos')).rows.length,0)
+test('server rejects past dates, invalid input, arbitrary slots and unaffiliated users',async()=>{
+ await assert.rejects(request({date:'2000-01-01'}),/pasado/)
+ await assert.rejects(request({time:'10:15'}),/Horario inválido/)
+ await assert.rejects(request({phone:'abcdef'}),/Teléfono inválido/)
+ await assert.rejects(request({name:' '}),/Nombre inválido/)
+ const t=await request()
+ await assert.rejects(change(adminA,t.id,'otro'),/Estado inválido/)
+ await assert.rejects(role('authenticated',uuid(99),'select * from turnia_v2_agenda($1::date,null)',['2099-05-01']),/perfil asignado/)
 })
-test('fresh installation works and unknown permissive policies abort safely', async () => {
- const fresh=new PGlite()
- try {
-  await fresh.exec(bootstrap)
-  await fresh.exec(migration)
-  await fresh.exec('create policy unknown_open on public.turnos for select using(true)')
-  await assert.rejects(fresh.exec(migration),/políticas personalizadas/)
-  await fresh.exec('rollback')
- } finally { await fresh.close() }
+test('existing exclusion constraint prevents overlap outside the public RPC',async()=>{
+ await request({service:longService})
+ const other=await request({time:'12:30'})
+ await assert.rejects(db.query("update turnos set hora='11:00' where id=$1",[other.id]),/exclusion constraint/)
 })

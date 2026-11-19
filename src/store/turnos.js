@@ -5,21 +5,21 @@ import { authState } from './auth.js'
 
 export const timeSlots = ['10:00', '11:00', '12:30', '16:00', '17:30', '18:30']
 export const turnos = reactive([])
-export const availability = reactive({ barberId: null, date: '', ready: false, loading: false, error: '', slots: [] })
+export const availability = reactive({ barberId: null, date: '', serviceId: null, ready: false, loading: false, error: '', slots: [] })
 let availabilityRequest = 0
 let agendaRequest = 0
 
 export function clearAvailability() {
   availabilityRequest++
-  Object.assign(availability, { barberId: null, date: '', ready: false, loading: false, error: '', slots: [] })
+  Object.assign(availability, { barberId: null, date: '', serviceId: null, ready: false, loading: false, error: '', slots: [] })
 }
-export async function refreshAvailability(barberId, date) {
+export async function refreshAvailability(barberId, date, serviceId = null) {
   const request = ++availabilityRequest
-  const same = availability.barberId === barberId && availability.date === date
-  Object.assign(availability, { barberId, date, loading: true, error: '' })
+  const same = availability.barberId === barberId && availability.date === date && availability.serviceId === serviceId
+  Object.assign(availability, { barberId, date, serviceId, loading: true, error: '' })
   if (!same) Object.assign(availability, { ready: false, slots: [] })
   try {
-    const rows = await listOccupied(barberId, date)
+    const rows = await listOccupied(barberId, date, serviceId)
     if (request !== availabilityRequest) return
     availability.slots = rows.map((row) => row.hora.slice(0, 5))
     availability.ready = true

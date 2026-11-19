@@ -33,7 +33,7 @@ function backToHome() {
 
       <p class="confirm-note">
         {{ booking.name }}, tu solicitud está pendiente de aceptación por el barbero.
-        La solicitud se guardó en la barbería. El horario quedará bloqueado cuando la confirme.
+        La solicitud se guardó en la barbería. El horario queda retenido mientras el profesional revisa la solicitud.
       </p>
 
       <button class="btn btn--ghost" @click="backToHome">Volver al inicio</button>
