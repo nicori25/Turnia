@@ -2,6 +2,10 @@
 
 Turnia es un prototipo de reservas de barbería, desarrollado con React Native y Expo SDK 58. La versión web y Expo Go usan las mismas pantallas.
 
+## Entrega académica
+
+El [índice de entrega](entrega/LEEME.md) reúne el informe técnico, el manual, las piezas de identidad y el maquetado editable.
+
 ## Probar la aplicación
 
 Usá Node.js LTS compatible con Expo SDK 58 e instalá las dependencias.

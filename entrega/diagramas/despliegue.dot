@@ -1,0 +1,16 @@
+digraph Turnia {
+  graph [rankdir=LR, bgcolor="#fbfaf5", pad=.24, ranksep=.55, nodesep=.26, fontname="DejaVu Sans"];
+  node [shape=box, style="rounded,filled", margin=".15,.12", fontname="DejaVu Sans", fontsize=12, color="#5d7465", fillcolor="#eef3e8", fontcolor="#17251c"];
+  edge [color="#496354", fontname="DejaVu Sans", fontcolor="#24382a", fontsize=10, arrowsize=.72];
+  websites [label="Alojamiento privado\nChatGPT Sites · dist/", fillcolor="#e1eddb"];
+  metro [label="Computadora de desarrollo\nMetro / Expo CLI", fillcolor="#e1eddb"];
+  browser [label="Navegador\nExpo Web"];
+  mobile [label="Celular\nExpo Go"];
+  supa [label="Supabase · HTTPS\nAuth + PostgREST / RPC", fillcolor="#c1eaa5"];
+  database [label="PostgreSQL\nRLS y exclusión de turnos", fillcolor="#f4d8ca"];
+  websites -> browser [label="  HTML + JS"];
+  metro -> mobile [label="  QR + bundle"];
+  browser -> supa [label="  API / sesión"];
+  mobile -> supa [label="  API / sesión"];
+  supa -> database [label="  SQL"];
+}

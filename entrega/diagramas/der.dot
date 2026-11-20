@@ -1,0 +1,25 @@
+digraph DER {
+  graph [rankdir=LR, bgcolor="#fbfaf5", pad=.24, nodesep=.45, ranksep=.62, fontname="DejaVu Sans"];
+  node [shape=Mrecord, style=filled, fillcolor="#edf3e9", color="#5d7465", fontname="DejaVu Sans", fontsize=12, fontcolor="#17251c", margin=".13,.08"];
+  edge [dir=both, arrowtail=tee, arrowhead=crow, color="#526d58", fontname="DejaVu Sans", fontcolor="#293c32", fontsize=10, arrowsize=.58];
+  org [label="{organizaciones|PK id\lslug único, nombre\l}",fillcolor="#c1eaa5"];
+  auth [label="{auth.users|PK id\l}"];
+  perfil [label="{perfiles|PK/FK id\lFK organizacion_id\lrol\l}"];
+  pro [label="{profesionales|PK id\lFK organizacion_id\lFK perfil_id opcional y único\l}"];
+  servicio [label="{servicios|PK id\lFK organizacion_id\lFK profesional_id opcional\lprecio, duración, activo\l}"];
+  cliente [label="{clientes|PK id\lFK organizacion_id\lnombre, teléfono\l}"];
+  turno [label="{turnos|PK id · solicitud_id único\lFK organizacion_id y profesional_id\lFK servicio_id y cliente_id opcionales\lfecha, hora, duración, periodo\lestado, datos históricos y total\l}",fillcolor="#f4d8ca"];
+  horario [label="{turnia_private.horarios|PK/FK profesional_id\lhoras configuradas\l}"];
+  org -> perfil;
+  org -> pro;
+  org -> servicio;
+  org -> cliente;
+  org -> turno [constraint=false];
+  auth -> perfil [arrowhead=otee,label="  opcional"];
+  perfil -> pro [arrowhead=otee,label="  opcional"];
+  pro -> servicio [arrowtail=otee];
+  pro -> turno;
+  pro -> horario [arrowhead=otee];
+  servicio -> turno [arrowtail=otee];
+  cliente -> turno [arrowtail=otee];
+}

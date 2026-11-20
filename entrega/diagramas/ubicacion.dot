@@ -1,0 +1,12 @@
+graph Sede {
+  graph [layout=neato, overlap=false, bgcolor="#fbfaf5", pad=.25, outputorder=edgesfirst];
+  node [shape=box, style="filled,rounded", fillcolor="#edf3e9", color="#526c58", fontcolor="#17251c", fontname="DejaVu Sans", fontsize=13, margin=".17,.11"];
+  edge [color="#526c58", style=dashed, penwidth=1.8];
+  sede [pos="2.7,1.4!", label="SEDE CONCEPTUAL\nEntorno de Plaza Italia · Palermo", fillcolor="#c1eaa5"];
+  subte [pos="0.4,2.6!", label="SUBTE D\nEstación Plaza Italia"];
+  tren [pos="5,2.6!", label="TREN SAN MARTÍN\nEstación Palermo"];
+  bici [pos="2.7,0!", label="BICICLETA COMPARTIDA\nEcobici · Plaza Italia"];
+  sede -- subte;
+  sede -- tren;
+  sede -- bici;
+}
