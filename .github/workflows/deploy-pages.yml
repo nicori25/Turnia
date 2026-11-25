@@ -30,10 +30,18 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_ROUTER_MODE: hash
         run: |
-          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo 'Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in repository Actions variables or secrets.'
-            exit 1
-          fi
+          # Empty Actions variables must not override the public .env file.
+          if [ -z "$VITE_SUPABASE_URL" ]; then unset VITE_SUPABASE_URL; fi
+          if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then unset VITE_SUPABASE_ANON_KEY; fi
+          node --input-type=module <<'JS'
+          import { loadEnv } from 'vite'
+          const config = loadEnv('production', process.cwd(), 'VITE_')
+          if (!config.VITE_SUPABASE_URL || !config.VITE_SUPABASE_ANON_KEY) {
+            throw new Error('Falta la configuración pública de Supabase en .env o Actions.')
+          }
+          const url = new URL(config.VITE_SUPABASE_URL)
+          if (url.protocol !== 'https:') throw new Error('La URL de Supabase debe usar HTTPS.')
+          JS
           npm run build -- --base "/${GITHUB_REPOSITORY#*/}/"
       - uses: actions/upload-pages-artifact@v3
         with:

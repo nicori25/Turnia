@@ -10,8 +10,10 @@ exitoso: comprobar su ejecución y la URL que devuelve GitHub.
 1. En Settings → Pages, seleccionar **GitHub Actions** como origen. La cuenta y
    el plan del repositorio deben permitir GitHub Pages; no cambiar su visibilidad
    para habilitarlo sin una decisión del propietario.
-2. En Settings → Secrets and variables → Actions, configurar
-   `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` como variables o secretos.
+2. El archivo `.env` del repositorio ya incluye `VITE_SUPABASE_URL` y
+   `VITE_SUPABASE_ANON_KEY` públicos. No hace falta crearlo manualmente.
+   Opcionalmente, en Settings → Secrets and variables → Actions, configurar
+   esas variables para reemplazar los valores del archivo.
    Usar la URL del proyecto y su clave pública anon; nunca service_role.
    Las variables VITE se incluyen en los archivos públicos del navegador incluso
    si se almacenan como secretos de Actions.
