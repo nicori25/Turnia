@@ -48,6 +48,8 @@ async function salir() {
       </button>
     </header>
 
+    <router-link class="btn btn--coral panel__new" :to="{ name: 'admin-turno-nuevo', query: { date } }">+ Nuevo turno</router-link>
+
     <div class="field">
       <label for="agenda-date">Fecha de la agenda</label>
       <input id="agenda-date" v-model="date" type="date" />
@@ -105,6 +107,11 @@ async function salir() {
 
 .panel__date {
   margin-bottom: 16px;
+}
+
+.panel__new {
+  margin-bottom: 24px;
+  text-decoration: none;
 }
 
 .panel__logout {

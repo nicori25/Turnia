@@ -5,6 +5,7 @@ import {PGlite} from '@electric-sql/pglite'
 import {btree_gist} from '@electric-sql/pglite/contrib/btree_gist'
 const migration=await readFile(new URL('../supabase/migrations/20261119_organizaciones_profesionales.sql',import.meta.url),'utf8')
 const onboarding=await readFile(new URL('../supabase/migrations/20261125_alta_barbero.sql',import.meta.url),'utf8')
+const crud=await readFile(new URL('../supabase/migrations/20261125_crud_turnos.sql',import.meta.url),'utf8')
 const fixture=await readFile(new URL('./fixtures/organizaciones.sql',import.meta.url),'utf8')
 const uuid=(n)=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const orgA=uuid(1),orgB=uuid(2),adminA=uuid(3),userA=uuid(4),adminB=uuid(5),userB=uuid(6)
@@ -37,7 +38,7 @@ before(async()=>{
  for(const [id,org,pro,name,duration,price] of [[serviceA,orgA,null,'Corte',30,4500],[serviceB,orgB,null,'Corte B',30,5000],[longService,orgA,null,'Servicio largo',90,7000],[privateService,orgA,proA,'Solo A',30,3000]])
   await db.query('insert into servicios(id,organizacion_id,profesional_id,nombre,duracion_min,precio)values($1,$2,$3,$4,$5,$6)',[id,org,pro,name,duration,price])
  policies=(await db.query('select * from pg_policies order by policyname')).rows
- await db.exec(migration);await db.exec(migration);await db.exec(onboarding);await db.exec(onboarding)
+ await db.exec(migration);await db.exec(migration);await db.exec(onboarding);await db.exec(onboarding);await db.exec(crud);await db.exec(crud)
 })
 beforeEach(async()=>{await db.exec('delete from turnos;delete from clientes')})
 after(async()=>db.close())
@@ -138,4 +139,57 @@ test('onboarding requires an authenticated user and valid business name',async()
  await db.query('insert into auth.users(id)values($1)',[id])
  await assert.rejects(prepare(id),/nombre del local/)
  assert.equal((await db.query('select count(*)::int n from perfiles where id=$1',[id])).rows[0].n,0)
+})
+
+async function save(user,options={}){
+ const r=await role('authenticated',user,'select turnia_v2_guardar_turno($1,$2,$3,$4::date,$5::time,$6,$7,$8,$9,$10) as receipt',
+ [options.id??null,options.pro??proA,options.service??serviceA,options.date??'2099-05-01',options.time??'10:00',options.name??'Cliente editado',options.phone??'1112345678',options.vip??false,options.status??'pendiente',options.token??token()])
+ return r.rows[0].receipt
+}
+const remove=(user,id)=>role('authenticated',user,'select turnia_v2_eliminar_turno($1)',[id])
+test('CRUD form options only expose authorized professionals and compatible services',async()=>{
+ const own=(await role('authenticated',userA,'select turnia_v2_opciones_turno() as options')).rows[0].options
+ assert.deepEqual(own.profesionales.map(p=>p.id),[proA])
+ assert(!own.servicios.some(s=>s.id===serviceB))
+ const admin=(await role('authenticated',adminA,'select turnia_v2_opciones_turno() as options')).rows[0].options
+ assert(admin.profesionales.some(p=>p.id===proA));assert(admin.profesionales.some(p=>p.id===proB));assert(!admin.profesionales.some(p=>p.id===proC))
+ await assert.rejects(role('anon',null,'select turnia_v2_opciones_turno()'),/permission denied/)
+})
+test('CRUD creates once, edits all fields and preserves appointment identity',async()=>{
+ const key=token(),created=await save(adminA,{token:key,status:'confirmado'})
+ assert.equal((await save(adminA,{token:key,status:'confirmado'})).id,created.id)
+ assert.equal((await db.query('select count(*)::int n from turnos')).rows[0].n,1)
+ await save(adminA,{id:created.id,pro:proB,service:longService,date:'2099-05-02',time:'16:00',name:'Nombre nuevo',phone:'1198765432',vip:true,status:'pendiente'})
+ const record=(await db.query('select * from turnos where id=$1',[created.id])).rows[0]
+ assert.equal(record.profesional_id,proB);assert.equal(record.servicio_id,longService);assert.equal(record.duracion_min,90)
+ assert.equal(record.precio_total,'8500');assert.equal(record.cliente_nombre,'Nombre nuevo');assert.equal(record.cliente_telefono,'1198765432')
+ assert.equal(record.estado,'pendiente');assert.equal(record.fecha.toISOString().slice(0,10),'2099-05-02')
+})
+test('CRUD rejects editing or deleting other organizations and other professionals',async()=>{
+ const record=await save(userA)
+ await assert.rejects(save(adminB,{id:record.id,pro:proC,service:serviceB}),/sin permiso/)
+ await assert.rejects(save(userB,{id:record.id,pro:proB}),/sin permiso/)
+ await assert.rejects(save(userA,{id:record.id,pro:proB}),/fuera de tu acceso/)
+ await assert.rejects(remove(adminB,record.id),/sin permiso/)
+ await assert.rejects(remove(userB,record.id),/sin permiso/)
+ assert.equal((await db.query('select profesional_id from turnos where id=$1',[record.id])).rows[0].profesional_id,proA)
+})
+test('CRUD detects rescheduling conflicts without altering the original record',async()=>{
+ await request({service:longService})
+ const record=await save(userA,{time:'12:30'})
+ await assert.rejects(save(userA,{id:record.id,time:'11:00'}),/ocupado/)
+ assert.equal((await db.query('select hora from turnos where id=$1',[record.id])).rows[0].hora,'12:30:00')
+})
+test('CRUD physical deletion releases the slot and preserves the client record',async()=>{
+ const record=await save(userA,{status:'confirmado'})
+ await remove(userA,record.id)
+ assert.equal((await db.query('select count(*)::int n from turnos')).rows[0].n,0)
+ assert.equal((await db.query('select count(*)::int n from clientes')).rows[0].n,1)
+ await request()
+})
+test('CRUD rejects past creation, invalid data and anonymous writes',async()=>{
+ await assert.rejects(save(adminA,{date:'2000-01-01'}),/pasado/)
+ await assert.rejects(save(adminA,{phone:'abcdef'}),/Teléfono inválido/)
+ await assert.rejects(save(adminA,{status:'desconocido'}),/Estado inválido/)
+ await assert.rejects(role('anon',null,'select turnia_v2_eliminar_turno($1)',[token()]),/permission denied/)
 })

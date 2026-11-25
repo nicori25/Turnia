@@ -40,6 +40,19 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/admin/turno/nuevo',
+    name: 'admin-turno-nuevo',
+    component: () => import('../views/admin/TurnoForm.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/admin/turno/:id/editar',
+    name: 'admin-turno-editar',
+    component: () => import('../views/admin/TurnoForm.vue'),
+    props: true,
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/admin/turno/:id',
     name: 'admin-turno-detalle',
     component: () => import('../views/admin/TurnoDetail.vue'),

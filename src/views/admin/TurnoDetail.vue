@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { loadTurno, setEstado } from '../../store/turnos'
 import { formatDate, isFutureSlot } from '../../utils/dates'
 import { useClock } from '../../composables/useClock'
+import { deleteAppointment } from '../../services/turnia'
 
 const props = defineProps({ id: String })
 const router = useRouter()
@@ -29,6 +30,17 @@ async function update(status) {
   } catch (e) { error.value = e.message }
   finally { saving.value = false }
 }
+
+async function remove() {
+  if (saving.value || !turno.value) return
+  if (!window.confirm(`¿Eliminar definitivamente el turno del ${formatDate(turno.value.date)} a las ${turno.value.time}? No se puede deshacer.`)) return
+  saving.value = true; error.value = ''
+  try {
+    await deleteAppointment(turno.value.id)
+    router.push({ name: 'admin-panel', query: { date: turno.value.date } })
+  } catch (e) { error.value = e.message }
+  finally { saving.value = false }
+}
 </script>
 
 <template>
@@ -46,8 +58,10 @@ async function update(status) {
       </p>
 
       <div class="detail-actions">
+        <router-link v-if="!saving" class="btn btn--coral detail-edit" :to="{ name: 'admin-turno-editar', params: { id: turno.id } }">Modificar turno</router-link>
         <button class="btn btn--coral" :disabled="saving || !canConfirm" @click="update('confirmado')">Confirmar turno</button>
         <button class="btn btn--ghost" :disabled="saving || turno.status === 'cancelado'" @click="update('cancelado')">Cancelar turno</button>
+        <button class="btn btn--ghost detail-delete" :disabled="saving" @click="remove">Eliminar turno</button>
       </div>
       <p v-if="turno.status === 'pendiente' && !canConfirm" class="form-error" role="status">La fecha o el horario ya pasaron.</p>
       <p v-if="error" class="form-error" role="alert">{{ error }}</p>
@@ -96,4 +110,7 @@ async function update(status) {
   flex-direction: column;
   gap: 10px;
 }
+
+.detail-edit { text-decoration: none; }
+.detail-delete { color: var(--color-coral); border-color: var(--color-coral); }
 </style>
