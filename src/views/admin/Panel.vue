@@ -5,12 +5,14 @@ import { loadAgenda, turnos } from '../../store/turnos'
 import { authState, logout } from '../../store/auth'
 import { businessDate, formatDate, isValidDate } from '../../utils/dates'
 import { useClock } from '../../composables/useClock'
+import { deleteAppointment } from '../../services/turnia'
 
 const router = useRouter()
 const route = useRoute()
 const date = ref(isValidDate(route.query.date) ? route.query.date : businessDate())
 const loading = ref(false)
 const error = ref('')
+const deleting = ref(null)
 const now = useClock()
 const dailyTurnos = computed(() => turnos.filter((t) => t.date === date.value))
 const businessName = computed(() => authState.user?.user_metadata?.business_name || 'Mi barbería')
@@ -34,6 +36,17 @@ function statusLabel(status) {
 async function salir() {
   try { await logout(); router.push({ name: 'home' }) } catch (e) { error.value = e.message }
 }
+
+async function remove(turno) {
+  if (deleting.value) return
+  if (!window.confirm(`¿Eliminar definitivamente el turno del ${formatDate(turno.date)} a las ${turno.time}? No se puede deshacer.`)) return
+  deleting.value = turno.id; error.value = ''
+  try {
+    await deleteAppointment(turno.id)
+    await refresh()
+  } catch (e) { error.value = e.message }
+  finally { deleting.value = null }
+}
 </script>
 
 <template>
@@ -49,6 +62,7 @@ async function salir() {
     </header>
 
     <router-link class="btn btn--coral panel__new" :to="{ name: 'admin-turno-nuevo', query: { date } }">+ Nuevo turno</router-link>
+    <p class="panel__help">Creá turnos o usá Ver, Modificar y Eliminar en cada registro de la agenda.</p>
 
     <div class="field">
       <label for="agenda-date">Fecha de la agenda</label>
@@ -59,7 +73,7 @@ async function salir() {
     <div v-if="error" class="form-error" role="alert">{{ error }} <button type="button" @click="refresh">Reintentar</button></div>
     <p v-if="!loading && !error && !dailyTurnos.length" role="status">No hay turnos para esta fecha.</p>
     <ul class="turno-list">
-      <li v-for="turno in dailyTurnos" :key="turno.id">
+      <li v-for="turno in dailyTurnos" :key="turno.id" class="turno-item">
         <button
           class="turno-row"
           type="button"
@@ -75,6 +89,13 @@ async function salir() {
             {{ statusLabel(turno.status) }}
           </span>
         </button>
+        <div class="turno-actions" role="group" :aria-label="`Acciones del turno de las ${turno.time}`">
+          <router-link :to="{ name: 'admin-turno-detalle', params: { id: turno.id } }">Ver</router-link>
+          <router-link :to="{ name: 'admin-turno-editar', params: { id: turno.id } }">Modificar</router-link>
+          <button type="button" :disabled="Boolean(deleting)" @click="remove(turno)">
+            {{ deleting === turno.id ? 'Eliminando…' : 'Eliminar' }}
+          </button>
+        </div>
       </li>
     </ul>
   </div>
@@ -114,6 +135,31 @@ async function salir() {
   text-decoration: none;
 }
 
+.panel__help { margin-bottom: 24px; font-size: 13px; }
+.turno-item {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+}
+.turno-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 12px 12px; }
+.turno-actions a, .turno-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-decoration: none;
+  font: inherit;
+  font-size: 13px;
+}
+.turno-actions button { color: var(--color-coral); }
+.turno-actions button:disabled { opacity: 0.5; cursor: wait; }
+
 .panel__logout {
   width: auto;
   padding: 10px 18px;
@@ -136,7 +182,7 @@ async function salir() {
   gap: 12px;
   padding: 14px 16px;
   background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: 8px;
   color: var(--color-text);
   text-align: left;
