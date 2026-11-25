@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'expo-router'
 import ArrowLeft from 'lucide-react-native/icons/arrow-left'
 import ArrowRight from 'lucide-react-native/icons/arrow-right'
@@ -20,23 +21,35 @@ export const colors = {
   ink: '#172416',
 }
 
-export function Button({ children, href, onPress, variant = 'primary', disabled, icon: Icon, style }) {
-  const quiet = variant === 'outline' || variant === 'text'
-  const foreground = quiet ? colors.text : colors.ink
+export function Button({ children, href, onPress, variant = 'primary', disabled, icon: Icon, iconPosition = 'end', style }) {
+  const [hovered, setHovered] = useState(false)
+  const [pressed, setPressed] = useState(false)
+  const [focused, setFocused] = useState(false)
+  const quiet = variant === 'outline' || variant === 'text' || variant === 'danger'
+  const foreground = variant === 'danger' ? colors.coral : quiet ? colors.text : colors.ink
   const button = (
     <Pressable
       accessibilityRole={href ? 'link' : 'button'}
       accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={({ pressed, hovered }) => [
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={StyleSheet.flatten([
         styles.button, styles[variant], style,
-        (pressed || hovered) && styles.buttonActive,
+        !disabled && hovered && styles.buttonHovered,
+        !disabled && pressed && styles.buttonPressed,
+        !disabled && focused && styles.buttonFocused,
         disabled && styles.disabled,
-      ]}
+      ])}
     >
+      {Icon && iconPosition === 'start' && <Icon size={18} color={foreground} />}
       <Text style={[styles.buttonText, { color: foreground }]}>{children}</Text>
-      {Icon && <Icon size={17} color={foreground} />}
+      {Icon && iconPosition !== 'start' && <Icon size={18} color={foreground} />}
     </Pressable>
   )
   return href ? <Link href={href} asChild>{button}</Link> : button
@@ -113,14 +126,7 @@ export function Field({ label, ...props }) {
 }
 
 export function BackLink({ href, children = 'Volver' }) {
-  return (
-    <Link href={href} asChild>
-      <Pressable accessibilityRole="link" style={styles.back}>
-        <ArrowLeft size={15} color={colors.muted} />
-        <Text style={styles.caption}>{children}</Text>
-      </Pressable>
-    </Link>
-  )
+  return <Button href={href} variant="outline" icon={ArrowLeft} iconPosition="start" style={styles.back}>{children}</Button>
 }
 
 export function Message({ children, error = false }) {
@@ -139,7 +145,7 @@ export const styles = StyleSheet.create({
   header: { borderBottomWidth: 1, borderColor: colors.border },
   nav: { minHeight: 76, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   navNarrow: { minHeight: 66, paddingHorizontal: 18 },
-  navButton: { paddingHorizontal: 15, minHeight: 40 },
+  navButton: { paddingHorizontal: 14, minHeight: 44, flexShrink: 1 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
   brandIcon: { width: 34, height: 34, borderRadius: 9, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   brandText: { color: colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.8 },
@@ -152,11 +158,14 @@ export const styles = StyleSheet.create({
   button: { minHeight: 48, paddingHorizontal: 20, paddingVertical: 9, borderWidth: 1, borderColor: 'transparent', borderRadius: 9, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
   primary: { backgroundColor: colors.green },
   admin: { backgroundColor: colors.coral },
-  outline: { borderColor: colors.border, backgroundColor: colors.bg },
-  text: { backgroundColor: 'transparent' },
-  buttonActive: { opacity: 0.82 },
+  outline: { borderColor: '#607360', backgroundColor: '#202c24' },
+  text: { borderColor: '#50664f', backgroundColor: '#1d2921' },
+  danger: { borderColor: colors.coral, backgroundColor: colors.coralDark },
+  buttonHovered: { borderColor: colors.green },
+  buttonPressed: { opacity: 0.78, transform: [{ scale: 0.98 }] },
+  buttonFocused: { borderColor: colors.green, borderWidth: 2 },
   disabled: { opacity: 0.48 },
-  buttonText: { fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  buttonText: { flexShrink: 1, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   heading: { gap: 8 },
   title: { color: colors.text, fontSize: 34, fontWeight: '800', letterSpacing: -1.1 },
   label: { color: colors.green, fontSize: 12, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase' },
@@ -168,7 +177,7 @@ export const styles = StyleSheet.create({
   field: { gap: 7 },
   fieldLabel: { color: colors.text, fontSize: 14, fontWeight: '600' },
   input: { minHeight: 48, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, color: colors.text, backgroundColor: colors.bg, fontSize: 16 },
-  back: { minHeight: 33, flexDirection: 'row', gap: 7, alignItems: 'center', alignSelf: 'flex-start' },
+  back: { minHeight: 44, paddingHorizontal: 14, alignSelf: 'flex-start' },
   message: { color: colors.text, backgroundColor: colors.greenDark, borderRadius: 8, padding: 12, lineHeight: 21, fontSize: 14 },
   error: { backgroundColor: colors.coralDark, color: colors.coral },
 })

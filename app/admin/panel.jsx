@@ -1,3 +1,7 @@
+import Plus from 'lucide-react-native/icons/plus'
+import Pencil from 'lucide-react-native/icons/pencil'
+import Eye from 'lucide-react-native/icons/eye'
+import Trash2 from 'lucide-react-native/icons/trash-2'
 import { useState } from 'react'
 import { Link, Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import CalendarDays from 'lucide-react-native/icons/calendar-days'
@@ -63,7 +67,7 @@ export default function Panel() {
       </View>
       {agenda.ready && agenda.allowed && !agenda.demo && (
         <View style={panel.actions}>
-          <Button href={{ pathname: '/admin/editar-turno', params: { date } }} variant="admin">Nuevo turno</Button>
+          <Button href={{ pathname: '/admin/editar-turno', params: { date } }} variant="admin" icon={Plus}>Nuevo turno</Button>
           <Button href="/admin/servicios" variant="outline">Administrar servicios</Button>
           <Button variant="outline" onPress={agenda.refresh} disabled={agenda.loading}>Actualizar agenda</Button>
         </View>
@@ -72,7 +76,7 @@ export default function Panel() {
         <Text style={styles.sectionTitle}>¿Eliminar el turno del {formatDate(deleteTarget.date)} a las {deleteTarget.time}?</Text>
         <Text style={styles.body}>Se borrará de forma permanente. Cancelar un turno, en cambio, conserva su registro.</Text>
         {deleteError ? <Message error>{deleteError}</Message> : null}
-        <Button variant="admin" disabled={deleting} onPress={remove}>{deleting ? 'Eliminando…' : 'Sí, eliminar turno'}</Button>
+        <Button variant="danger" icon={Trash2} disabled={deleting} onPress={remove}>{deleting ? 'Eliminando…' : 'Sí, eliminar turno'}</Button>
         <Button variant="outline" disabled={deleting} onPress={() => setDeleteTarget(null)}>Conservar turno</Button>
       </Card>}
       {signOutError ? <Message error>{signOutError}</Message> : null}
@@ -97,7 +101,7 @@ export default function Panel() {
           <View key={booking.id} style={panel.item}>
           <Link href={{ pathname: '/admin/turno', params: { id: booking.id } }} asChild>
             <Pressable accessibilityRole="link" accessibilityLabel={`${booking.time}, ${booking.name}`}
-              style={({ hovered, pressed }) => [panel.row, (hovered || pressed) && panel.rowActive]}>
+              style={panel.row}>
               <Text style={panel.time}>{booking.time}</Text>
               <View style={panel.customer}>
                 <Text style={styles.sectionTitle}>{booking.name}</Text>
@@ -108,9 +112,9 @@ export default function Panel() {
             </Pressable>
           </Link>
           {!agenda.demo && <View style={panel.actions}>
-            <Button href={{ pathname: '/admin/turno', params: { id: booking.id } }} variant="outline">Ver</Button>
-            <Button href={{ pathname: '/admin/editar-turno', params: { id: booking.id } }} variant="outline">Modificar</Button>
-            <Button variant="outline" disabled={deleting} onPress={() => { setDeleteError(''); setDeleteTarget(booking) }}>Eliminar</Button>
+            <Button href={{ pathname: '/admin/turno', params: { id: booking.id } }} variant="outline" style={panel.rowAction} icon={Eye}>Ver</Button>
+            <Button href={{ pathname: '/admin/editar-turno', params: { id: booking.id } }} variant="outline" style={panel.rowAction} icon={Pencil}>Modificar</Button>
+            <Button variant="danger" style={panel.rowAction} icon={Trash2} disabled={deleting} onPress={() => { setDeleteError(''); setDeleteTarget(booking) }}>Eliminar</Button>
           </View>}
           </View>
         ))}
@@ -121,14 +125,14 @@ export default function Panel() {
 
 const panel = StyleSheet.create({
   item: { gap: 8 },
+  rowAction: { minHeight: 44, paddingHorizontal: 12 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   heading: { flex: 1 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dateBar: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   date: { flex: 1 },
-  dateButton: { alignItems: 'center', justifyContent: 'center', width: 40, height: 42, borderWidth: 1, borderColor: colors.border, borderRadius: 7 },
+  dateButton: { alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderWidth: 1, borderColor: '#607360', backgroundColor: '#202c24', borderRadius: 8 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.bg, borderRadius: 9 },
-  rowActive: { borderColor: colors.coral },
   time: { color: colors.coral, fontSize: 16, fontWeight: '800', paddingTop: 1 },
   customer: { flex: 1, gap: 3, minWidth: 0 },
 })

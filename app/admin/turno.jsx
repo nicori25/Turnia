@@ -1,3 +1,5 @@
+import Trash2 from 'lucide-react-native/icons/trash-2'
+import Pencil from 'lucide-react-native/icons/pencil'
 import { useCallback, useRef, useState } from 'react'
 import { Redirect, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { Text } from 'react-native'
@@ -73,7 +75,7 @@ function AppointmentDetails({ id }) {
               {prompt === 'delete' ? (
                 <>
                   <Text style={styles.body}>Se borrará el turno de la agenda de forma permanente.</Text>
-                  <Button variant="admin" disabled={busy} onPress={() => run(async () => {
+                  <Button variant="danger" icon={Trash2} disabled={busy} onPress={() => run(async () => {
                     const result = await deleteAppointment(booking.id)
                     if (focused.current) router.dismissTo(agendaRoute(result.fecha))
                   })}>Sí, eliminar turno</Button>
@@ -95,8 +97,8 @@ function AppointmentDetails({ id }) {
               )}
               {!agenda.demo && (
                 <>
-                  <Button href={{ pathname: '/admin/editar-turno', params: { id } }} variant="outline" disabled={busy}>Modificar turno</Button>
-                  <Button variant="outline" disabled={busy} onPress={() => setPrompt('delete')}>Eliminar turno</Button>
+                  <Button href={{ pathname: '/admin/editar-turno', params: { id } }} variant="outline" icon={Pencil} disabled={busy}>Modificar turno</Button>
+                  <Button variant="danger" icon={Trash2} disabled={busy} onPress={() => setPrompt('delete')}>Eliminar turno</Button>
                 </>
               )}
             </>

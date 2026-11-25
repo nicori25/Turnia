@@ -39,3 +39,12 @@ No se agrega una migración ni se requiere repetir SQL por estos cambios.
 - No se ejecutaron pruebas en emuladores nativos ni se modificaron datos del
   proyecto Supabase real. La publicación del código no acredita por sí sola el
   resultado del despliegue de Pages.
+
+## Botones y enlaces
+
+El componente compartido de botones utiliza estilos planos para los enlaces
+`Link asChild` de Expo. Así conserva fondo, borde, espaciado y tamaño táctil en
+web. Incluye estados de foco, hover, pulsación y deshabilitado; los enlaces Volver
+y las acciones secundarias también tienen una superficie visible. El panel usa
+iconos para Nuevo, Ver, Modificar y Eliminar, con un estilo de peligro separado
+para el borrado. No cambia las operaciones ni los permisos de la base.
