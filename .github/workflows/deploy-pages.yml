@@ -28,6 +28,8 @@ jobs:
       - uses: actions/configure-pages@v5
         id: pages
       - run: npm ci --no-audit --no-fund
+      - name: Check appointment validation
+        run: npm test
       - name: Export Expo web
         env:
           EXPO_NO_TELEMETRY: '1'

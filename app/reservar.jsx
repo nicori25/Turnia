@@ -4,9 +4,11 @@ import ArrowRight from 'lucide-react-native/icons/arrow-right'
 import Check from 'lucide-react-native/icons/check'
 import Sparkles from 'lucide-react-native/icons/sparkles'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import { BackLink, Button, Card, colors, Heading, Message, Screen, styles } from '../src/components/ui'
-import { businessDate, formatPrice, slotAvailable, timeSlots, upcomingDates } from '../src/domain/booking'
+import { BackLink, Button, Card, colors, Field, Heading, Message, Screen, styles } from '../src/components/ui'
+import { businessDate, formatPrice, isFutureBusinessSlot, slotAvailable, timeSlots, upcomingDates } from '../src/domain/booking'
+import { isAgendaDate } from '../src/domain/appointment-validation'
 import { loadAvailability } from '../src/domain/reservations'
+import { useBusinessClock } from '../src/domain/use-business-clock'
 import { useTurnia } from '../src/domain/turnia'
 
 function Option({ selected, disabled = false, onPress, label, children, compact = false }) {
@@ -23,28 +25,31 @@ function Option({ selected, disabled = false, onPress, label, children, compact 
 export default function Reserve() {
   const { live, catalog, catalogError, reloadCatalog, draft, updateDraft, bookings } = useTurnia()
   const router = useRouter()
+  const now = useBusinessClock()
   const { width } = useWindowDimensions()
   const [availability, setAvailability] = useState(null)
   const [revision, setRevision] = useState(0)
-  const dates = upcomingDates(live ? catalog?.today ?? businessDate() : undefined)
-  const date = dates.some(({ key }) => key === draft.date) ? draft.date : dates[0].key
+  const today = businessDate(now)
+  const dates = upcomingDates(live && catalog?.today > today ? catalog.today : today)
+  const date = draft.date || dates[0].key
   const catalogServices = catalog?.services ?? []
-  const professionals = Array.from(new Map(catalogServices.map((item) => [item.professionalId, item.professional + ' · ' + item.business])))
+  const professionals = Array.from(new Map(catalogServices.map((item) => [item.professionalId, [item.professional, item.business].filter(Boolean).join(' · ')])))
   const professionalId = professionals.some(([id]) => id === draft.professionalId) ? draft.professionalId : professionals[0]?.[0]
   const services = catalogServices.filter((item) => item.professionalId === professionalId)
   const service = services.find(({ id }) => id === draft.serviceId)
   const serviceId = service?.serviceId
-  const requestKey = draft.serviceId + ':' + date + ':' + revision
+  const requestKey = draft.serviceId + ':' + date + ':' + revision + ':' + now.getTime()
   const result = availability?.key === requestKey ? availability : null
   const times = live ? result?.times ?? [] : timeSlots
   const available = (time) => live
-    ? times.includes(time)
-    : slotAvailable(bookings, date, time, service?.duration ?? 30)
+    ? isAgendaDate(date) && isFutureBusinessSlot(date, time, now) && times.includes(time)
+    : slotAvailable(bookings, date, time, service?.duration ?? 30, now)
   const canContinue = !!service && available(draft.time)
   const surcharge = catalog?.surcharge ?? 0
 
   useFocusEffect(useCallback(() => {
     if (!live || !serviceId) return
+    if (!isAgendaDate(date) || date < today) { setAvailability({ key: requestKey, times: [] }); return }
     const controller = new AbortController()
     setAvailability(null)
     loadAvailability(serviceId, professionalId, date, controller.signal).then(
@@ -52,7 +57,7 @@ export default function Reserve() {
       () => { if (!controller.signal.aborted) setAvailability({ key: requestKey, error: true }) },
     )
     return () => controller.abort()
-  }, [date, live, professionalId, requestKey, serviceId]))
+  }, [date, live, professionalId, requestKey, serviceId, today]))
 
   function next() {
     if (!canContinue) return
@@ -123,6 +128,9 @@ export default function Reserve() {
                   </Option>
                 ))}
               </View>
+              <Field label="Otra fecha (AAAA-MM-DD)" value={date} placeholder="AAAA-MM-DD"
+                maxLength={10} autoCorrect={false} onChangeText={(date) => updateDraft({ date, time: '' })} />
+              {(!isAgendaDate(date) || date < today) && <Message error>Elegí una fecha válida desde hoy.</Message>}
               <Text accessibilityRole="header" style={styles.sectionTitle}>Horario</Text>
               <View style={booking.options}>
                 {times.map((time) => (

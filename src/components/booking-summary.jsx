@@ -10,7 +10,7 @@ export function BookingSummary({ service, date, time, professional, business, su
         <Text style={styles.body}>{service}</Text>
         <Text style={styles.body}>{formatPrice(price - surcharge)}</Text>
       </View>
-      {professional && <Text style={styles.body}>{professional} · {business}</Text>}
+      {professional && <Text style={styles.body}>{[professional, business].filter(Boolean).join(' · ')}</Text>}
       <Text style={styles.body}>{formatDate(date)} · {time} h</Text>
       {surcharge > 0 && (
         <View style={summary.row}>

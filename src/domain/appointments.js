@@ -1,4 +1,4 @@
-import { supabase } from './auth'
+import { supabase } from '../lib/supabase'
 
 export const appointmentStates = {
   pendiente: 'Pendiente',
@@ -10,19 +10,7 @@ export function isAppointmentId(value) {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
 
-export function isAgendaDate(value) {
-  if (typeof value !== 'string' || !/^[1-9]\d{3}-\d{2}-\d{2}$/.test(value)) return false
-  const date = new Date(value + 'T00:00:00Z')
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
-}
-
-export function validAppointmentCustomer(name, phone) {
-  const length = Array.from(name.trim()).length
-  const number = phone.trim()
-  const digits = number.replace(/\D/g, '').length
-  return length >= 2 && length <= 100 && number.length <= 30
-    && /^[+()0-9 .-]+$/.test(number) && digits >= 6 && digits <= 20
-}
+export { isAgendaDate, validAppointmentCustomer, appointmentFormError } from './appointment-validation'
 
 function appointmentError(error) {
   if (error.code === '23P01' || error.message === 'Horario ocupado') {

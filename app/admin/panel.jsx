@@ -8,7 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Button, Card, colors, Heading, Message, Screen, styles } from '../../src/components/ui'
 import { Status } from '../../src/components/status'
 import { useAgenda } from '../../src/domain/agenda'
-import { isAgendaDate } from '../../src/domain/appointments'
+import { deleteAppointment, isAgendaDate } from '../../src/domain/appointments'
 import { useTurnia } from '../../src/domain/turnia'
 import { businessDate, formatDate, localDate } from '../../src/domain/booking'
 
@@ -20,12 +20,16 @@ function moveDate(value, offset) {
 export default function Panel() {
   const { admin: demo } = useTurnia()
   const { date: routeDate } = useLocalSearchParams()
-  const date = isAgendaDate(routeDate) ? routeDate : demo ? localDate() : businessDate()
+  const date = isAgendaDate(routeDate) ? routeDate : businessDate()
   const [signOutError, setSignOutError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const router = useRouter()
   const agenda = useAgenda({ date })
 
-  if (agenda.ready && !agenda.allowed) return <Redirect href="/admin/login" />
+  if (!agenda.ready) return <Screen admin><Message>Cargando sesión…</Message></Screen>
+  if (!agenda.allowed) return <Redirect href="/admin/login" />
 
   async function signOut() {
     setSignOutError('')
@@ -35,6 +39,17 @@ export default function Panel() {
     } catch {
       setSignOutError('No pudimos cerrar la sesión. Intentá nuevamente.')
     }
+  }
+
+  async function remove() {
+    if (!deleteTarget || deleting) return
+    setDeleting(true); setDeleteError('')
+    try {
+      await deleteAppointment(deleteTarget.id)
+      setDeleteTarget(null)
+      agenda.refresh()
+    } catch (error) { setDeleteError(error.message) }
+    finally { setDeleting(false) }
   }
 
   return (
@@ -53,6 +68,13 @@ export default function Panel() {
           <Button variant="outline" onPress={agenda.refresh} disabled={agenda.loading}>Actualizar agenda</Button>
         </View>
       )}
+      {deleteTarget && <Card>
+        <Text style={styles.sectionTitle}>¿Eliminar el turno del {formatDate(deleteTarget.date)} a las {deleteTarget.time}?</Text>
+        <Text style={styles.body}>Se borrará de forma permanente. Cancelar un turno, en cambio, conserva su registro.</Text>
+        {deleteError ? <Message error>{deleteError}</Message> : null}
+        <Button variant="admin" disabled={deleting} onPress={remove}>{deleting ? 'Eliminando…' : 'Sí, eliminar turno'}</Button>
+        <Button variant="outline" disabled={deleting} onPress={() => setDeleteTarget(null)}>Conservar turno</Button>
+      </Card>}
       {signOutError ? <Message error>{signOutError}</Message> : null}
       {agenda.demo && <Message>La agenda de prueba se comparte con las reservas de esta sesión. Al recargar, se restablecen los datos de ejemplo.</Message>}
       <Card>
@@ -72,7 +94,8 @@ export default function Panel() {
           <Text style={styles.body}>Todavía no hay turnos para este día.</Text>
         )}
         {agenda.records.map((booking) => (
-          <Link key={booking.id} href={{ pathname: '/admin/turno', params: { id: booking.id } }} asChild>
+          <View key={booking.id} style={panel.item}>
+          <Link href={{ pathname: '/admin/turno', params: { id: booking.id } }} asChild>
             <Pressable accessibilityRole="link" accessibilityLabel={`${booking.time}, ${booking.name}`}
               style={({ hovered, pressed }) => [panel.row, (hovered || pressed) && panel.rowActive]}>
               <Text style={panel.time}>{booking.time}</Text>
@@ -84,6 +107,12 @@ export default function Panel() {
               <ChevronRight size={18} color={colors.muted} />
             </Pressable>
           </Link>
+          {!agenda.demo && <View style={panel.actions}>
+            <Button href={{ pathname: '/admin/turno', params: { id: booking.id } }} variant="outline">Ver</Button>
+            <Button href={{ pathname: '/admin/editar-turno', params: { id: booking.id } }} variant="outline">Modificar</Button>
+            <Button variant="outline" disabled={deleting} onPress={() => { setDeleteError(''); setDeleteTarget(booking) }}>Eliminar</Button>
+          </View>}
+          </View>
         ))}
       </Card>
     </Screen>
@@ -91,6 +120,7 @@ export default function Panel() {
 }
 
 const panel = StyleSheet.create({
+  item: { gap: 8 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 },
   heading: { flex: 1 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

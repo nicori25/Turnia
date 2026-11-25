@@ -4,11 +4,12 @@ import { randomUUID } from 'expo-crypto'
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 import { BackLink, Button, Card, colors, Field, Heading, Message, Screen, styles } from '../../src/components/ui'
 import {
-  agendaRoute, appointmentStates, isAgendaDate, isAppointmentId, loadAppointment,
-  loadAppointmentOptions, saveAppointment, validAppointmentCustomer,
+  agendaRoute, appointmentFormError, appointmentStates, isAgendaDate, isAppointmentId, loadAppointment,
+  loadAppointmentOptions, saveAppointment,
 } from '../../src/domain/appointments'
 import { useAuth } from '../../src/domain/auth'
 import { businessDate, formatPrice, isFutureBusinessSlot, timeSlots, vipSurcharge } from '../../src/domain/booking'
+import { useBusinessClock } from '../../src/domain/use-business-clock'
 import { useTurnia } from '../../src/domain/turnia'
 
 function Choices({ label, items, value, onChange, disabled }) {
@@ -30,6 +31,7 @@ function Choices({ label, items, value, onChange, disabled }) {
 
 function AppointmentForm({ id, initialDate }) {
   const router = useRouter()
+  const now = useBusinessClock()
   const [form, setForm] = useState(null)
   const [initial, setInitial] = useState(null)
   const [options, setOptions] = useState(null)
@@ -77,9 +79,8 @@ function AppointmentForm({ id, initialDate }) {
   const historicalUnchanged = initial && ['date', 'time', 'professionalId', 'serviceId', 'status']
     .every((key) => initial[key] === form[key])
   const validSlot = form && isAgendaDate(form.date) && timeSlots.includes(form.time)
-    && (historicalUnchanged || isFutureBusinessSlot(form.date, form.time))
-  const valid = validSlot && service && professionals.some(({ id }) => id === form.professionalId)
-    && validAppointmentCustomer(form.name, form.phone)
+    && (historicalUnchanged || isFutureBusinessSlot(form.date, form.time, now))
+
 
   function update(changes) {
     setError('')
@@ -87,7 +88,9 @@ function AppointmentForm({ id, initialDate }) {
   }
 
   async function submit() {
-    if (!valid || pending.current) return
+    if (pending.current || !form || loading) return
+    const message = appointmentFormError(form, professionals, services, initial, now)
+    if (message) { setError(message); return }
     pending.current = true
     setSaving(true)
     setError('')
@@ -146,7 +149,7 @@ function AppointmentForm({ id, initialDate }) {
           </View>
           {service && <Text style={styles.sectionTitle}>Total: {formatPrice(Number(service.precio) + (form.vip ? vipSurcharge : 0))}</Text>}
           {error && <Message error>{error}</Message>}
-          <Button variant="admin" disabled={!valid || saving} onPress={submit}>
+          <Button variant="admin" disabled={saving} onPress={submit}>
             {saving ? 'Guardando…' : id ? 'Guardar cambios' : 'Crear turno'}
           </Button>
         </Card>

@@ -1,12 +1,14 @@
 import { useCallback, useState } from 'react'
 import { useFocusEffect } from 'expo-router'
 import { supabase, useAuth } from './auth'
+import { useBusinessClock } from './use-business-clock'
 import { updateAppointmentStatus } from './appointments'
 import { useTurnia } from './turnia'
 
 export function useAgenda({ date, id }) {
   const demo = useTurnia()
-  const { session, ready } = useAuth()
+  const now = useBusinessClock()
+  const { session, ready, accountError } = useAuth()
   const userId = session?.user.id
   const [records, setRecords] = useState([])
   const [loadedQuery, setLoadedQuery] = useState('')
@@ -15,17 +17,20 @@ export function useAgenda({ date, id }) {
   const queryKey = [userId, date, id].join('|')
 
   useFocusEffect(useCallback(() => {
-    if (demo.admin || !userId || (!date && !id)) return
+    if (demo.admin || !ready || !userId || (!date && !id)) return
     let active = true
     setError('')
-    setLoadedQuery('')
+    setLoadedQuery((loaded) => loaded === queryKey ? loaded : '')
 
     async function load() {
       try {
-        const { data, error } = await supabase.rpc('mi_agenda_turnia', {
+        let { data, error } = await supabase.rpc('turnia_v2_agenda', {
+          p_fecha: date ?? null, p_id: id || null,
+        })
+        if (['PGRST202', '42883'].includes(error?.code)) ({ data, error } = await supabase.rpc('mi_agenda_turnia', {
           p_fecha: date ?? null,
           p_turno_id: id || null,
-        })
+        }))
         if (error) throw error
         if (!active) return
         setRecords(data.map((row) => ({
@@ -50,7 +55,7 @@ export function useAgenda({ date, id }) {
 
     load()
     return () => { active = false }
-  }, [date, demo.admin, id, queryKey, revision, userId]))
+  }, [date, demo.admin, id, queryKey, revision, userId, ready, now]))
 
   async function changeStatus(bookingId, status) {
     if (demo.admin) {
@@ -71,7 +76,7 @@ export function useAgenda({ date, id }) {
     ready: demo.admin || ready,
     loading: !demo.admin && !!userId && !!(date || id) && loadedQuery !== queryKey,
     records: demo.admin ? demoRecords : loadedQuery === queryKey && !error ? records : [],
-    error: demo.admin || loadedQuery !== queryKey ? '' : error,
+    error: demo.admin ? '' : accountError || (loadedQuery === queryKey ? error : ''),
     refresh: () => setRevision((value) => value + 1),
     changeStatus,
     leave: demo.admin ? () => demo.setAdmin(false) : async () => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'expo-crypto'
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { supabase } from './auth'
-import { localDate, sampleBookings, services, slotAvailable, validCustomer, vipSurcharge } from './booking'
+import { businessDate, sampleBookings, services, slotAvailable, validCustomer, vipSurcharge } from './booking'
 import { loadCatalog, saveReservation } from './reservations'
 
 const Turnia = createContext(null)
@@ -58,7 +58,7 @@ export function TurniaProvider({ children }) {
       ...initialDraft,
       professionalId: service?.professionalId ?? '',
       serviceId: service?.id ?? '',
-      date: catalog?.today ?? localDate(),
+      date: catalog?.today ?? businessDate(),
     })
     setReceipt(null)
     reloadCatalog()
@@ -82,6 +82,8 @@ export function TurniaProvider({ children }) {
         if (request.current === currentRequest) setReceipt({ ...booking, name: name.trim(), professional: service.professional, business: service.business, surcharge })
         return ''
       } catch (error) {
+        if (error.code === '23P01' || error.message === 'Horario ocupado') return messages.HORARIO_NO_DISPONIBLE
+        if (error.message === 'Fecha u horario pasado') return 'La fecha o el horario ya pasaron. Volvé a elegir un turno.'
         if (error.message === 'PRECIO_CAMBIO' || error.message === 'SERVICIO_NO_DISPONIBLE') reloadCatalog()
         return messages[error.message] ?? 'No pudimos confirmar la solicitud. Reintentá con los mismos datos para comprobar si se guardó.'
       }

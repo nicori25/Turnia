@@ -24,6 +24,9 @@ export function businessDate(now = new Date()) {
 }
 
 export function isFutureBusinessSlot(date, time, now = new Date()) {
+  if (!/^[1-9]\d{3}-\d{2}-\d{2}$/.test(date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return false
+  const parsed = new Date(date + 'T00:00:00Z')
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return false
   const parts = Object.fromEntries(businessClock.formatToParts(now).map(({ type, value }) => [type, value]))
   return `${date}T${time}` > `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
@@ -54,8 +57,7 @@ function minutes(time) {
 
 export function slotAvailable(bookings, date, time, duration, now = new Date()) {
   const start = minutes(time)
-  const today = localDate(now)
-  if (!timeSlots.includes(time) || date < today || (date === today && start <= now.getHours() * 60 + now.getMinutes())) return false
+  if (!timeSlots.includes(time) || !isFutureBusinessSlot(date, time, now)) return false
   return bookings.every((booking) => {
     if (booking.date !== date || booking.status === 'cancelado') return true
     const reserved = minutes(booking.time)
@@ -63,7 +65,7 @@ export function slotAvailable(bookings, date, time, duration, now = new Date()) 
   })
 }
 
-export function sampleBookings(date = localDate()) {
+export function sampleBookings(date = businessDate()) {
   return [
     { id: 'demo-1', time: '10:00', name: 'Martín Díaz', serviceId: 'corte', vip: false, status: 'confirmado' },
     { id: 'demo-2', time: '11:00', name: 'Julieta Sosa', serviceId: 'corte-barba', vip: true, status: 'confirmado' },

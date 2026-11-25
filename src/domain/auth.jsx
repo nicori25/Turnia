@@ -1,32 +1,22 @@
-import 'react-native-url-polyfill/auto'
 import { createContext, useContext, useEffect, useState } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { createClient } from '@supabase/supabase-js'
 import { AppState, Platform } from 'react-native'
-
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL
-const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-
-export const supabase = url && key ? createClient(url, key, {
-  auth: {
-    ...(Platform.OS !== 'web' ? { storage: AsyncStorage } : {}),
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web',
-  },
-}) : null
+import { prepareAccount } from './appointments'
+import { supabase } from '../lib/supabase'
+export { supabase } from '../lib/supabase'
 
 const Auth = createContext(null)
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [ready, setReady] = useState(!supabase)
+  const [authLoaded, setAuthLoaded] = useState(!supabase)
+  const [accountError, setAccountError] = useState('')
 
   useEffect(() => {
     if (!supabase) return
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      setReady(true)
+      setAuthLoaded(true)
     })
     const stateListener = Platform.OS === 'web' ? null : AppState.addEventListener('change', (state) => {
       if (state === 'active') supabase.auth.startAutoRefresh()
@@ -39,7 +29,20 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  return <Auth.Provider value={{ session, ready }}>{children}</Auth.Provider>
+  // Se ejecuta fuera del callback de Auth: evita bloquear internamente al SDK.
+  const userId = session?.user.id
+  useEffect(() => {
+    if (!authLoaded) return
+    let active = true
+    setAccountError('')
+    if (!userId) { setReady(true); return }
+    setReady(false)
+    prepareAccount().catch((error) => { if (active) setAccountError(error.message) })
+      .finally(() => { if (active) setReady(true) })
+    return () => { active = false }
+  }, [authLoaded, userId])
+
+  return <Auth.Provider value={{ session, ready, accountError }}>{children}</Auth.Provider>
 }
 
 export const useAuth = () => useContext(Auth)
