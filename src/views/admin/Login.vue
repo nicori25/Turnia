@@ -21,7 +21,7 @@ async function submit() {
     await login({ email: email.value, password: password.value })
     router.push({ name: 'admin-panel' })
   } catch (e) {
-    error.value = 'Email o contraseña incorrectos.'
+    error.value = e.accountSetup ? e.message : 'Email o contraseña incorrectos.'
   } finally {
     loading.value = false
   }

@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises'
 import {PGlite} from '@electric-sql/pglite'
 import {btree_gist} from '@electric-sql/pglite/contrib/btree_gist'
 const migration=await readFile(new URL('../supabase/migrations/20261119_organizaciones_profesionales.sql',import.meta.url),'utf8')
+const onboarding=await readFile(new URL('../supabase/migrations/20261125_alta_barbero.sql',import.meta.url),'utf8')
 const fixture=await readFile(new URL('./fixtures/organizaciones.sql',import.meta.url),'utf8')
 const uuid=(n)=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`
 const orgA=uuid(1),orgB=uuid(2),adminA=uuid(3),userA=uuid(4),adminB=uuid(5),userB=uuid(6)
@@ -24,7 +25,7 @@ const change=(user,id,status)=>role('authenticated',user,'select turnia_v2_estad
 const agenda=async(user,date='2099-05-01')=>(await role('authenticated',user,'select * from turnia_v2_agenda($1::date,null)',[date])).rows
 before(async()=>{
  db=new PGlite({extensions:{btree_gist}})
- await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key);
+ await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key, raw_user_meta_data jsonb default '{}');
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
  grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;`)
  await db.exec(fixture)
@@ -36,7 +37,7 @@ before(async()=>{
  for(const [id,org,pro,name,duration,price] of [[serviceA,orgA,null,'Corte',30,4500],[serviceB,orgB,null,'Corte B',30,5000],[longService,orgA,null,'Servicio largo',90,7000],[privateService,orgA,proA,'Solo A',30,3000]])
   await db.query('insert into servicios(id,organizacion_id,profesional_id,nombre,duracion_min,precio)values($1,$2,$3,$4,$5,$6)',[id,org,pro,name,duration,price])
  policies=(await db.query('select * from pg_policies order by policyname')).rows
- await db.exec(migration);await db.exec(migration)
+ await db.exec(migration);await db.exec(migration);await db.exec(onboarding);await db.exec(onboarding)
 })
 beforeEach(async()=>{await db.exec('delete from turnos;delete from clientes')})
 after(async()=>db.close())
@@ -100,4 +101,41 @@ test('existing exclusion constraint prevents overlap outside the public RPC',asy
  await request({service:longService})
  const other=await request({time:'12:30'})
  await assert.rejects(db.query("update turnos set hora='11:00' where id=$1",[other.id]),/exclusion constraint/)
+})
+
+const prepare=(user)=>role('authenticated',user,'select turnia_v2_preparar_cuenta() as setup')
+test('new barber onboarding creates its own organization, linked active professional and catalog once',async()=>{
+ const id=uuid(501)
+ await db.query('insert into auth.users(id,raw_user_meta_data)values($1,$2)',[id,{business_name:'Local nuevo',rol:'admin',organizacion_id:orgA}])
+ const first=(await prepare(id)).rows[0].setup,again=(await prepare(id)).rows[0].setup
+ assert.deepEqual(first,again);assert.notEqual(first.organizacion_id,orgA);assert.equal(first.activo,true)
+ const profile=(await db.query('select * from perfiles where id=$1',[id])).rows[0]
+ assert.equal(profile.rol,'admin');assert.equal(profile.organizacion_id,first.organizacion_id)
+ const pro=(await db.query('select * from profesionales where id=$1',[first.profesional_id])).rows[0]
+ assert.equal(pro.perfil_id,id)
+ assert.equal((await db.query('select count(*)::int n from servicios where profesional_id=$1',[pro.id])).rows[0].n,3)
+ const directory=(await role('anon',null,'select * from turnia_v2_locales()')).rows
+ assert(directory.some(p=>p.id===pro.id))
+})
+test('onboarding preserves an existing professional and does not reactivate disabled staff',async()=>{
+ const before=(await db.query('select count(*)::int n from servicios')).rows[0].n
+ await db.query('update profesionales set activo=false where id=$1',[proA])
+ const setup=(await prepare(userA)).rows[0].setup
+ assert.equal(setup.organizacion_id,orgA);assert.equal(setup.profesional_id,proA);assert.equal(setup.activo,false)
+ assert.equal((await db.query('select count(*)::int n from servicios')).rows[0].n,before)
+ await db.query('update profesionales set activo=true where id=$1',[proA])
+})
+test('unlinked employee cannot self-assign a new professional in an existing organization',async()=>{
+ const id=uuid(502)
+ await db.query('insert into auth.users(id)values($1)',[id])
+ await db.query("insert into perfiles(id,organizacion_id,nombre,rol)values($1,$2,'Empleado','profesional')",[id,orgA])
+ await assert.rejects(prepare(id),/todavía no está vinculada/)
+ assert.equal((await db.query('select count(*)::int n from profesionales where perfil_id=$1',[id])).rows[0].n,0)
+})
+test('onboarding requires an authenticated user and valid business name',async()=>{
+ await assert.rejects(role('anon',null,'select turnia_v2_preparar_cuenta()'),/permission denied/)
+ const id=uuid(503)
+ await db.query('insert into auth.users(id)values($1)',[id])
+ await assert.rejects(prepare(id),/nombre del local/)
+ assert.equal((await db.query('select count(*)::int n from perfiles where id=$1',[id])).rows[0].n,0)
 })

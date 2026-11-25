@@ -5,6 +5,7 @@ export function publicError(error) {
   if (/ocupado|unique|23505|exclusion|conflicting key/i.test(message) || ['23505', '23P01'].includes(error?.code)) return 'Ese horario ya está ocupado. Elegí otro horario.'
   if (/pasado/i.test(message)) return 'La fecha o el horario ya pasaron. Elegí otro turno.'
   if (/Teléfono inválido|Nombre inválido|Estado inválido|ya utilizado/i.test(message)) return message
+  if (/nombre del local|todavía no está vinculada|vinculación de organización/i.test(message)) return message
   if (/42501|permiso|Sesión requerida/i.test(message) || error?.code === '42501') return 'No tenés permiso para realizar esta operación. Volvé a iniciar sesión.'
   if (/PGRST202|PGRST205|42883|42P01/.test(error?.code ?? '')) return 'Falta aplicar la actualización de la base de datos en Supabase.'
   if (/Falta configurar/.test(message)) return message
@@ -16,6 +17,7 @@ async function resolve(query) {
   return data
 }
 const rpc = (name, params) => resolve(getSupabase().rpc(name, params))
+export const prepareAccount = () => rpc('turnia_v2_preparar_cuenta')
 export const listBusinesses = () => rpc('turnia_v2_locales')
 export const listServices = (id) => rpc('turnia_v2_servicios', { p_profesional_id: id })
 export const listOccupied = (id, date, serviceId) => rpc('turnia_v2_ocupados', { p_profesional_id: id, p_fecha: date, p_servicio_id: serviceId || null })

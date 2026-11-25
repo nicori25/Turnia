@@ -35,12 +35,12 @@ async function submit() {
     if (!data.session) {
       // Con la confirmación por email activada, Supabase no abre sesión
       // hasta que el usuario confirma el link que le llega al mail.
-      notice.value = 'Te mandamos un mail para confirmar tu cuenta. Confirmalo y después iniciá sesión.'
+      notice.value = 'Te mandamos un mail para confirmar tu cuenta. Confirmalo y después iniciá sesión para activar tu local.'
       return
     }
     router.push({ name: 'admin-panel' })
   } catch (e) {
-    error.value = e.message?.includes('already registered')
+    error.value = e.accountSetup ? e.message : e.message?.includes('already registered')
       ? 'Ese email ya tiene una cuenta.'
       : 'No pudimos crear la cuenta, probá de nuevo.'
   } finally {

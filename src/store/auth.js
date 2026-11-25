@@ -1,7 +1,12 @@
 import { reactive } from 'vue'
 import { getSupabase, supabase } from '../lib/supabaseClient.js'
+import { prepareAccount } from '../services/turnia.js'
 
 export const authState = reactive({ user: null, ready: false, error: '' })
+async function ensureAccount() {
+  try { await prepareAccount(); authState.error = '' }
+  catch (e) { authState.error = e.message; e.accountSetup = true; throw e }
+}
 let initialization
 export function initAuth() {
   if (initialization) return initialization
@@ -12,8 +17,9 @@ export function initAuth() {
       const { data, error } = await client.auth.getSession()
       if (error) throw error
       authState.user = data.session?.user ?? null
-    } catch {
-      authState.error = supabase ? 'No pudimos recuperar tu sesión. Volvé a iniciar sesión.' : 'Falta configurar Supabase.'
+      if (authState.user) await ensureAccount()
+    } catch (e) {
+      authState.error = supabase ? e.message : 'Falta configurar Supabase.'
     } finally { authState.ready = true }
   })()
   return initialization
@@ -23,12 +29,14 @@ export async function register({ email, password, businessName }) {
     options: { data: { business_name: businessName.trim() } } })
   if (error) throw error
   authState.user = data.session?.user ?? null
+  if (data.session) await ensureAccount()
   return data
 }
 export async function login({ email, password }) {
   const { data, error } = await getSupabase().auth.signInWithPassword({ email, password })
   if (error) throw error
   authState.user = data.session?.user ?? null
+  await ensureAccount()
   return data
 }
 export async function logout() {
