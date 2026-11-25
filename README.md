@@ -21,7 +21,7 @@ Para abrir la app en un celular con Expo Go compatible con SDK 58, conectá ambo
 npm run build:web
 ```
 
-La compilación web se exporta a `dist/`. Para publicarla, el alojamiento debe servir los archivos HTML de cada ruta, incluidas `/admin/login` y `/admin/turno`.
+La compilación web se exporta a `dist/`. Para publicarla, el alojamiento debe servir los archivos HTML de cada ruta, incluidas `/admin/login`, `/admin/turno` y `/admin/editar-turno`.
 
 ## Recorrido de demostración sin Supabase
 
@@ -34,10 +34,11 @@ Las reservas y los cambios de la demo viven en memoria. La agenda de prueba y el
 
 ## Reservas con Supabase
 
-1. Prepará una instancia local con `supabase start` o vinculá la CLI al proyecto de Turnia y aplicá la migración de `supabase/migrations/` con `supabase db push`.
+1. Para desarrollo local, iniciá una instancia descartable con `supabase start`. Las migraciones de `supabase/migrations/` instalan las reservas y las funciones que usa la agenda. El proyecto alojado de Turnia ya tiene las funciones de alta y gestión de turnos habilitadas.
 2. La rama `App` ya incluye la URL y la clave pública de Turnia en `.env`. Para usar otra instancia, copiá `.env.example` a `.env.local` y completá sus valores. En Expo Go, usá una URL que el teléfono pueda abrir.
 3. Registrá una cuenta de barbero. Si está habilitada la confirmación por correo, configurá las URL de redirección en Supabase y validá la cuenta antes del primer ingreso.
-4. Desde **Agenda de turnos → Administrar servicios**, cargá los servicios, sus duraciones y precios. Los servicios activos aparecen en el catálogo. Una vez hecha una reserva, abrí la fecha correspondiente en la agenda o usá **Actualizar agenda** si ya la tenías abierta.
+4. Al ingresar por primera vez se vincula el perfil con un profesional y el alta puede crear un catálogo inicial. Desde **Agenda de turnos → Administrar servicios**, podés actualizar servicios, duraciones y precios. Los servicios activos aparecen en el catálogo.
+5. Usá **Nuevo turno** para registrar un turno desde la agenda. En el detalle podés modificarlo, confirmarlo, cancelarlo o eliminarlo. Cancelar conserva el registro. Eliminar lo borra después de pedir confirmación. Ambas acciones liberan el horario. Si cambiás la fecha de un turno, la app abre la agenda del día resultante.
 
 Sin las variables de Supabase, la app abre la demostración local. Con las variables definidas, muestra el catálogo y la disponibilidad de la base configurada. Los turnos se ofrecen durante siete días en la zona horaria de Buenos Aires. Cada profesional tiene seis horarios diarios iniciales, configurables mediante `turnia_private.horarios`.
 
@@ -49,7 +50,7 @@ En un proyecto con datos, hacé un respaldo y ejecutá [la consulta de diagnóst
 
 ### Prueba de integración de reservas
 
-Con una instancia local descartable iniciada, usá su clave pública. La prueba crea dos cuentas ficticias y sus servicios, prueba solicitudes simultáneas y verifica los permisos y la cancelación.
+Con una instancia local descartable iniciada, usá su clave pública. La prueba crea cuentas ficticias y comprueba las reservas simultáneas, el alta, los permisos y la creación, edición y eliminación de turnos.
 
 ```sh
 TURNIA_TEST_KEY=<clave-publica-local> node supabase/tests/reservas.mjs

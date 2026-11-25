@@ -9,6 +9,7 @@ export default function AdminLayout() {
       <Stack.Screen name="panel" options={{ title: 'Agenda del barbero · Turnia' }} />
       <Stack.Screen name="servicios" options={{ title: 'Servicios · Turnia' }} />
       <Stack.Screen name="turno" options={{ title: 'Detalle del turno · Turnia' }} />
+      <Stack.Screen name="editar-turno" options={{ title: 'Gestionar turno · Turnia' }} />
     </Stack>
   )
 }

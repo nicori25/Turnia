@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Redirect, useRouter } from 'expo-router'
+import { Link, Redirect, useLocalSearchParams, useRouter } from 'expo-router'
 import CalendarDays from 'lucide-react-native/icons/calendar-days'
 import ChevronLeft from 'lucide-react-native/icons/chevron-left'
 import ChevronRight from 'lucide-react-native/icons/chevron-right'
@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Button, Card, colors, Heading, Message, Screen, styles } from '../../src/components/ui'
 import { Status } from '../../src/components/status'
 import { useAgenda } from '../../src/domain/agenda'
+import { isAgendaDate } from '../../src/domain/appointments'
 import { useTurnia } from '../../src/domain/turnia'
 import { businessDate, formatDate, localDate } from '../../src/domain/booking'
 
@@ -18,7 +19,8 @@ function moveDate(value, offset) {
 
 export default function Panel() {
   const { admin: demo } = useTurnia()
-  const [date, setDate] = useState(demo ? localDate : businessDate)
+  const { date: routeDate } = useLocalSearchParams()
+  const date = isAgendaDate(routeDate) ? routeDate : demo ? localDate() : businessDate()
   const [signOutError, setSignOutError] = useState('')
   const router = useRouter()
   const agenda = useAgenda({ date })
@@ -46,6 +48,7 @@ export default function Panel() {
       </View>
       {agenda.ready && agenda.allowed && !agenda.demo && (
         <View style={panel.actions}>
+          <Button href={{ pathname: '/admin/editar-turno', params: { date } }} variant="admin">Nuevo turno</Button>
           <Button href="/admin/servicios" variant="outline">Administrar servicios</Button>
           <Button variant="outline" onPress={agenda.refresh} disabled={agenda.loading}>Actualizar agenda</Button>
         </View>
@@ -56,10 +59,10 @@ export default function Panel() {
         <View style={panel.dateBar}>
           <CalendarDays size={19} color={colors.coral} />
           <Text accessibilityRole="header" style={[styles.sectionTitle, panel.date]}>{formatDate(date)}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Día anterior" onPress={() => setDate(moveDate(date, -1))} style={panel.dateButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Día anterior" onPress={() => router.setParams({ date: moveDate(date, -1) })} style={panel.dateButton}>
             <ChevronLeft size={21} color={colors.text} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Día siguiente" onPress={() => setDate(moveDate(date, 1))} style={panel.dateButton}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Día siguiente" onPress={() => router.setParams({ date: moveDate(date, 1) })} style={panel.dateButton}>
             <ChevronRight size={21} color={colors.text} />
           </Pressable>
         </View>

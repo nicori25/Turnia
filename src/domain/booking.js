@@ -13,11 +13,19 @@ export function localDate(date = new Date()) {
   return [date.getFullYear(), month, day].join('-')
 }
 
+const businessClock = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+})
+
 export function businessDate(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(now)
+  const parts = businessClock.formatToParts(now)
   return ['year', 'month', 'day'].map((type) => parts.find((part) => part.type === type).value).join('-')
+}
+
+export function isFutureBusinessSlot(date, time, now = new Date()) {
+  const parts = Object.fromEntries(businessClock.formatToParts(now).map(({ type, value }) => [type, value]))
+  return `${date}T${time}` > `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 
 export function upcomingDates(today = localDate()) {

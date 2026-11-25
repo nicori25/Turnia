@@ -30,7 +30,7 @@ function rpc(name, payload = {}, token) {
   return call(rest + '/rpc/' + name, { method: 'POST', payload, token })
 }
 
-async function register(label) {
+async function register(label, { prepare = true } = {}) {
   const suffix = randomUUID().slice(0, 8)
   const email = `turnia-${suffix}@example.com`
   const password = randomUUID()
@@ -43,8 +43,10 @@ async function register(label) {
   assert.equal(login.status, 200, login.body?.msg ?? 'Habilitá el registro local y desactivá la confirmación por correo para esta prueba.')
   assert(login.body.access_token)
   const token = login.body.access_token
-  assert.equal((await rpc('preparar_cuenta_turnia', { p_nombre: label }, token)).body, true)
-  assert.equal((await rpc('preparar_cuenta_turnia', { p_nombre: 'Otro nombre' }, token)).body, true)
+  if (prepare) {
+    assert.equal((await rpc('preparar_cuenta_turnia', { p_nombre: label }, token)).body, true)
+    assert.equal((await rpc('preparar_cuenta_turnia', { p_nombre: 'Otro nombre' }, token)).body, true)
+  }
   return { id: body.user.id, token }
 }
 
@@ -165,3 +167,48 @@ assert.deepEqual((await availability(long)).body, [])
 assert.equal((await book({ ...booking, p_solicitud_id: randomUUID(), p_hora: '16:00' })).body.message, 'SERVICIO_NO_DISPONIBLE')
 
 console.log('Reservas verificadas mediante Auth y PostgREST: concurrencia, precio, reintentos, permisos, cancelaciones y catálogo.')
+
+const newBarber = await register('Barbería de alta', { prepare: false })
+const setup = await rpc('turnia_v2_preparar_cuenta', {}, newBarber.token)
+assert.equal(setup.status, 200, setup.body?.message)
+assert.equal(setup.body.activo, true)
+assert.deepEqual((await rpc('turnia_v2_preparar_cuenta', {}, newBarber.token)).body, setup.body)
+const choices = (await rpc('turnia_v2_opciones_turno', {}, newBarber.token)).body
+assert.deepEqual(choices.profesionales.map(({ id }) => id), [setup.body.profesional_id])
+assert.equal(choices.servicios.length, 3)
+const cut = choices.servicios.find(({ nombre }) => nombre === 'Corte')
+const payload = {
+  p_id: null, p_profesional_id: setup.body.profesional_id, p_servicio_id: cut.id,
+  p_fecha: date, p_hora: '10:00', p_nombre: 'Cliente de agenda', p_telefono: '11 4321 8765',
+  p_vip: false, p_estado: 'pendiente', p_solicitud_id: randomUUID(),
+}
+const saveTurn = (values, token = newBarber.token) => rpc('turnia_v2_guardar_turno', { ...payload, ...values }, token)
+const created = await saveTurn()
+assert.equal(created.status, 200, created.body?.message)
+assert.equal((await saveTurn()).body.id, created.body.id)
+assert.equal((await saveTurn({ p_solicitud_id: randomUUID() })).body.message, 'Horario ocupado')
+assert.equal((await saveTurn({ p_id: created.body.id }, second.token)).status, 403)
+
+const modified = await saveTurn({
+  p_id: created.body.id, p_solicitud_id: null, p_hora: '16:00', p_nombre: 'Cliente corregido', p_vip: true,
+})
+assert.equal(modified.status, 200, modified.body?.message)
+const turnId = created.body.id
+const fetchTurn = (token) => rpc('turnia_v2_agenda', { p_id: turnId, p_fecha: null }, token)
+const updated = (await fetchTurn(newBarber.token)).body[0]
+assert.equal(updated.id, turnId)
+assert.equal(updated.hora, '16:00:00')
+assert.equal(updated.cliente_nombre, 'Cliente corregido')
+assert.equal(updated.precio_total, 6000)
+assert.deepEqual((await fetchTurn(second.token)).body, [])
+assert([401, 403, 404].includes((await fetchTurn()).status))
+const statusResult = await rpc('turnia_v2_estado', { p_id: turnId, p_estado: 'confirmado' }, newBarber.token)
+assert.equal(statusResult.body.estado, 'confirmado')
+assert(!(await availability(cut.id, date, setup.body.profesional_id)).body.includes('16:00:00'))
+assert.equal((await rpc('turnia_v2_eliminar_turno', { p_id: turnId }, second.token)).status, 403)
+const deleted = await rpc('turnia_v2_eliminar_turno', { p_id: turnId }, newBarber.token)
+assert.equal(deleted.body.id, turnId)
+assert.deepEqual((await fetchTurn(newBarber.token)).body, [])
+assert((await availability(cut.id, date, setup.body.profesional_id)).body.includes('16:00:00'))
+
+console.log('Alta y agenda verificadas: catálogo inicial, creación idempotente, edición, confirmación, aislamiento y eliminación.')

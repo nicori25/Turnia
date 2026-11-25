@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useFocusEffect } from 'expo-router'
 import { supabase, useAuth } from './auth'
+import { updateAppointmentStatus } from './appointments'
 import { useTurnia } from './turnia'
 
 export function useAgenda({ date, id }) {
@@ -56,9 +57,8 @@ export function useAgenda({ date, id }) {
       demo.setStatus(bookingId, status)
       return
     }
-    const { data, error } = await supabase.rpc('cambiar_estado_turnia', { p_turno_id: bookingId, p_estado: status })
-    if (error || !data) throw new Error('No se pudo actualizar el turno.')
-    setRecords((current) => current.map((booking) => booking.id === bookingId ? { ...booking, status } : booking))
+    const result = await updateAppointmentStatus(bookingId, status)
+    setRecords((current) => current.map((booking) => booking.id === bookingId ? { ...booking, status: result.estado } : booking))
   }
 
   const demoRecords = demo.bookings
